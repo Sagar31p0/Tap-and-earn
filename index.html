@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Earn Bot - Telegram Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Ad Networks SDKs -->
+    <!-- Adexium -->
+    <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
+    
+    <!-- Monetag -->
+    <script src="//libtl.com/sdk.js" data-zone="10055887" data-sdk="show_10055887"></script>
+    
+    <!-- Richads -->
+    <script src="https://richinfo.co/richpartners/telegram/js/tg-ob.js"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading-screen">
+            <div class="loader">
+                <i class="fas fa-robot fa-4x"></i>
+                <p>Loading...</p>
+            </div>
+        </div>
+
+        <!-- Main Container -->
+        <div id="main-container" style="display: none;">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="header-content">
+                    <div class="user-info">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="user-name">User</span>
+                    </div>
+                    <div class="coin-balance" onclick="navigateTo('wallet')">
+                        <div class="coin-icon">💰</div>
+                        <div class="balance-info">
+                            <div class="balance-label">Balance</div>
+                            <div class="balance-amount" id="coin-balance">0</div>
+                            <div class="balance-usd" id="balance-usd">≈ $0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <main id="content-area">
+                <!-- Home / Tap Screen -->
+                <div id="screen-home" class="screen active">
+                    <div class="energy-bar">
+                        <div class="energy-info">
+                            <i class="fas fa-bolt"></i>
+                            <span id="energy-text">100/100</span>
+                        </div>
+                        <div class="energy-progress">
+                            <div class="energy-fill" id="energy-fill" style="width: 100%"></div>
+                        </div>
+                    </div>
+
+                    <div class="tap-container">
+                        <div class="tap-coin" id="tap-coin">
+                            <div class="coin-glow"></div>
+                            <i class="fas fa-coins fa-8x"></i>
+                        </div>
+                        <div id="tap-counter">+0</div>
+                    </div>
+
+                    <button class="btn-watch-ad" id="btn-recharge-energy" style="display: none;">
+                        <i class="fas fa-video"></i> Watch Ad to Recharge Energy
+                    </button>
+                </div>
+
+                <!-- Spin Wheel Screen -->
+                <div id="screen-spin" class="screen">
+                    <div class="spin-header">
+                        <h2><i class="fas fa-circle-notch"></i> Spin the Wheel</h2>
+                        <p id="spin-info">Loading...</p>
+                    </div>
+
+                    <div class="wheel-container">
+                        <canvas id="wheel-canvas" width="350" height="350"></canvas>
+                        <div class="wheel-pointer"></div>
+                    </div>
+
+                    <button class="btn-primary btn-large" id="btn-spin" disabled>
+                        <i class="fas fa-circle-notch"></i> SPIN NOW
+                    </button>
+
+                    <div id="spin-result" class="result-modal" style="display: none;">
+                        <div class="result-content">
+                            <h3>🎉 Congratulations!</h3>
+                            <p class="result-value"></p>
+                            <div class="result-actions">
+                                <button class="btn-secondary" onclick="closeSpin Result()">Claim</button>
+                                <button class="btn-primary" id="btn-double-reward">
+                                    <i class="fas fa-video"></i> Watch Ad & Double
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tasks Screen -->
+                <div id="screen-tasks" class="screen">
+                    <div class="screen-header">
+                        <h2><i class="fas fa-tasks"></i> Tasks</h2>
+                    </div>
+
+                    <div class="tabs">
+                        <button class="tab active" data-tab="one_time">One-Time Tasks</button>
+                        <button class="tab" data-tab="daily">Daily Tasks</button>
+                    </div>
+
+                    <div class="task-list" id="task-list-one_time"></div>
+                    <div class="task-list" id="task-list-daily" style="display: none;"></div>
+                </div>
+
+                <!-- Games Screen -->
+                <div id="screen-games" class="screen">
+                    <div class="screen-header">
+                        <h2><i class="fas fa-gamepad"></i> Play & Earn</h2>
+                    </div>
+
+                    <div class="game-list" id="game-list"></div>
+                </div>
+
+                <!-- Referrals Screen -->
+                <div id="screen-referrals" class="screen">
+                    <div class="screen-header">
+                        <h2><i class="fas fa-user-friends"></i> Invite Friends</h2>
+                    </div>
+
+                    <div class="referral-stats">
+                        <div class="stat-box">
+                            <div class="stat-value" id="ref-total">0</div>
+                            <div class="stat-label">Total Referrals</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="ref-approved">0</div>
+                            <div class="stat-label">Approved</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="ref-earnings">0</div>
+                            <div class="stat-label">Total Earnings</div>
+                        </div>
+                    </div>
+
+                    <div class="referral-link-box">
+                        <p>Your Referral Link:</p>
+                        <div class="link-copy">
+                            <input type="text" id="referral-link" readonly>
+                            <button onclick="copyReferralLink()"><i class="fas fa-copy"></i></button>
+                        </div>
+                        <button class="btn-primary btn-large" onclick="shareReferralLink()">
+                            <i class="fab fa-telegram"></i> Share on Telegram
+                        </button>
+                    </div>
+
+                    <div class="referral-list" id="referral-list"></div>
+                </div>
+
+                <!-- Wallet Screen -->
+                <div id="screen-wallet" class="screen">
+                    <div class="screen-header">
+                        <h2><i class="fas fa-wallet"></i> Wallet</h2>
+                    </div>
+
+                    <div class="wallet-balance-card">
+                        <h3>Current Balance</h3>
+                        <div class="large-balance" id="wallet-balance">0</div>
+                        <div class="balance-usd-large" id="wallet-usd">≈ $0.00</div>
+                    </div>
+
+                    <div class="withdrawal-section">
+                        <h4>Request Withdrawal</h4>
+                        <form id="withdrawal-form">
+                            <div class="form-group">
+                                <label>Amount (coins)</label>
+                                <input type="number" id="withdrawal-amount" step="0.01" placeholder="Minimum: 10" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Payment Method</label>
+                                <select id="payment-method" required>
+                                    <option value="">Select method...</option>
+                                </select>
+                            </div>
+                            <div id="payment-fields"></div>
+                            <button type="submit" class="btn-primary btn-large">
+                                <i class="fas fa-paper-plane"></i> Request Withdrawal
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="withdrawal-history">
+                        <h4>Withdrawal History</h4>
+                        <div id="withdrawal-list"></div>
+                    </div>
+                </div>
+
+                <!-- Leaderboard Screen -->
+                <div id="screen-leaderboard" class="screen">
+                    <div class="screen-header">
+                        <h2><i class="fas fa-trophy"></i> Leaderboard</h2>
+                    </div>
+
+                    <div class="leaderboard-list" id="leaderboard-list"></div>
+
+                    <div class="user-rank-card" id="user-rank-card">
+                        <h4>Your Rank</h4>
+                        <div class="rank-info">
+                            <span class="rank-number" id="user-rank-number">#?</span>
+                            <span class="rank-value" id="user-rank-value">0 coins</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <button class="nav-btn active" data-screen="home">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </button>
+                <button class="nav-btn" data-screen="spin">
+                    <i class="fas fa-circle-notch"></i>
+                    <span>Spin</span>
+                </button>
+                <button class="nav-btn" data-screen="tasks">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </button>
+                <button class="nav-btn" data-screen="games">
+                    <i class="fas fa-gamepad"></i>
+                    <span>Games</span>
+                </button>
+                <button class="nav-btn" data-screen="referrals">
+                    <i class="fas fa-user-friends"></i>
+                    <span>Invite</span>
+                </button>
+                <button class="nav-btn" data-screen="wallet">
+                    <i class="fas fa-wallet"></i>
+                    <span>Wallet</span>
+                </button>
+                <button class="nav-btn" data-screen="leaderboard">
+                    <i class="fas fa-trophy"></i>
+                    <span>Top</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/ads.js"></script>
+</body>
+</html>
