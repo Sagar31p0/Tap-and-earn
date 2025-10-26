@@ -1,31 +1,32 @@
-# Enable Rewrite Engine
-RewriteEngine On
-
-# Force HTTPS (if available)
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-# Deny access to sensitive files
-<FilesMatch "^(config\.php|database\.sql|\.htaccess|error\.log)$">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
-
-# Prevent directory browsing
-Options -Indexes
-
-# Set default index file
-DirectoryIndex index.html index.php
-
 # Security Headers
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Compress files
+# Enable Rewrite Engine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /test/
+    
+    # Redirect short links to redirect page
+    RewriteRule ^r/([a-zA-Z0-9]+)$ redirect.php?code=$1 [L,QSA]
+    
+    # Prevent direct access to config
+    RewriteRule ^config\.php$ - [F,L]
+</IfModule>
+
+# Disable directory browsing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "\.(htaccess|htpasswd|ini|log|sh|sql)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Enable GZIP compression
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
 </IfModule>
@@ -37,13 +38,9 @@ DirectoryIndex index.html index.php
     ExpiresByType image/jpeg "access plus 1 year"
     ExpiresByType image/gif "access plus 1 year"
     ExpiresByType image/png "access plus 1 year"
-    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType text/css "access plus 1 month"
     ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType application/x-javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
 </IfModule>
-
-# PHP settings
-php_value upload_max_filesize 10M
-php_value post_max_size 10M
-php_value max_execution_time 300
-php_value max_input_time 300
