@@ -123,6 +123,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link <?php echo $currentPage === 'shortener' ? 'active' : ''; ?>" href="shortener.php">
+                                <i class="fas fa-link"></i> URL Shortener
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link <?php echo $currentPage === 'withdrawals' ? 'active' : ''; ?>" href="withdrawals.php">
                                 <i class="fas fa-wallet"></i> Withdrawals
                             </a>
