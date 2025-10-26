@@ -27,29 +27,11 @@ async function initializeApp() {
     const initData = tg.initDataUnsafe;
     const user = initData.user;
     
-    // Fallback for testing outside Telegram
-    if (!user && window.location.hostname === 'localhost') {
-        console.warn('Running in test mode');
-        const testUser = {
-            id: 123456789,
-            username: 'testuser',
-            first_name: 'Test',
-            last_name: 'User'
-        };
-        await authenticateUser(testUser);
-        return;
-    }
-    
     if (!user) {
-        hideLoading();
         showError('Please open this app from Telegram');
         return;
     }
     
-    await authenticateUser(user);
-}
-
-async function authenticateUser(user) {
     // Check for referral code
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -63,48 +45,33 @@ async function authenticateUser(user) {
         referral_code: refCode
     };
     
-    try {
-        const response = await fetch(`${API_URL}/auth.php`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(authData)
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            userData = data.user;
-            updateUI();
-            hideLoading();
-            
-            // Load initial data (with error handling)
-            try {
-                await Promise.allSettled([
-                    loadTasks(),
-                    loadGames(),
-                    loadReferrals(),
-                    loadWallet(),
-                    checkSpinAvailability(),
-                    loadLeaderboard()
-                ]);
-            } catch (err) {
-                console.warn('Some features failed to load:', err);
-            }
-            
-            // Start energy recharge timer
-            startEnergyRecharge();
-        } else {
-            hideLoading();
-            showError(data.error || 'Authentication failed');
-        }
-    } catch (error) {
-        console.error('Auth error:', error);
+    const response = await fetch(`${API_URL}/auth.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+        userData = data.user;
+        updateUI();
         hideLoading();
-        showError('Failed to connect to server. Please check your connection.');
+        
+        // Load initial data
+        await Promise.all([
+            loadTasks(),
+            loadGames(),
+            loadReferrals(),
+            loadWallet(),
+            checkSpinAvailability(),
+            loadLeaderboard()
+        ]);
+        
+        // Start energy recharge timer
+        startEnergyRecharge();
+    } else {
+        showError('Authentication failed');
     }
 }
 
