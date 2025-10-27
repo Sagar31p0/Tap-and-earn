@@ -72,6 +72,14 @@ try {
     // Add transaction
     addTransaction($userId, 'tap', $coinsEarned, "Earned from {$actualTaps} taps");
     
+    // Check if ad should be shown based on tap frequency
+    $tapAdFrequency = (int)getSetting('tap_ad_frequency', 7);
+    $stmt = $db->prepare("SELECT total_taps FROM user_stats WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $totalTaps = $stmt->fetchColumn();
+    
+    $shouldShowAd = ($totalTaps % $tapAdFrequency === 0);
+    
     // Get updated user data
     $stmt = $db->prepare("SELECT coins, energy FROM users WHERE id = ?");
     $stmt->execute([$userId]);
@@ -84,7 +92,8 @@ try {
         'taps' => $actualTaps,
         'coins_earned' => $coinsEarned,
         'total_coins' => (float)$updatedUser['coins'],
-        'energy' => (int)$updatedUser['energy']
+        'energy' => (int)$updatedUser['energy'],
+        'show_ad' => $shouldShowAd
     ]);
     
 } catch (Exception $e) {
