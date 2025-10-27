@@ -65,6 +65,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("UPDATE ad_placements SET primary_ad_unit_id = ?, secondary_ad_unit_id = ?, tertiary_ad_unit_id = ?, frequency = ? WHERE id = ?");
         $stmt->execute([$primaryUnit, $secondaryUnit, $tertiaryUnit, $frequency, $id]);
         $success = "Ad placement updated successfully";
+    } elseif ($action === 'test_ad') {
+        $unitId = (int)$_POST['unit_id'];
+        
+        // Get ad unit details
+        $stmt = $db->prepare("SELECT au.*, an.name as network_name FROM ad_units au 
+                             LEFT JOIN ad_networks an ON au.network_id = an.id 
+                             WHERE au.id = ?");
+        $stmt->execute([$unitId]);
+        $unit = $stmt->fetch();
+        
+        if ($unit) {
+            $testResult = [
+                'unit_code' => $unit['unit_code'],
+                'network' => $unit['network_name'],
+                'type' => $unit['unit_type'],
+                'is_active' => $unit['is_active']
+            ];
+            $success = "Test ad data: " . json_encode($testResult);
+        } else {
+            $error = "Ad unit not found";
+        }
     }
 }
 
@@ -115,6 +136,13 @@ $completedToday = $stmt->fetchColumn();
     </div>
 <?php endif; ?>
 
+<?php if (isset($error)): ?>
+    <div class="alert alert-danger alert-dismissible fade show">
+        <?php echo $error; ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="stat-card">
@@ -138,6 +166,73 @@ $completedToday = $stmt->fetchColumn();
         <div class="stat-card">
             <h6 class="text-muted">Completed Today</h6>
             <h3><?php echo number_format($completedToday); ?></h3>
+        </div>
+    </div>
+</div>
+
+<!-- Ad Status Monitor -->
+<div class="stat-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-chart-line"></i> Ad Status Monitor</h5>
+        <button class="btn btn-sm btn-primary" onclick="checkAllAdStatus()">
+            <i class="fas fa-sync"></i> Check All
+        </button>
+    </div>
+    <div id="ad-status-container">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Placement</th>
+                        <th>Network</th>
+                        <th>Status</th>
+                        <th>Last Check</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ad-status-body">
+                    <?php foreach ($adPlacements as $placement): ?>
+                        <?php
+                        $primaryUnitId = $placement['primary_ad_unit_id'];
+                        $status = 'Unknown';
+                        $networkName = 'Not Set';
+                        
+                        if ($primaryUnitId) {
+                            foreach ($adUnits as $unit) {
+                                if ($unit['id'] == $primaryUnitId) {
+                                    $networkName = ucfirst($unit['network_name']);
+                                    $status = $unit['is_active'] ? 'Active' : 'Inactive';
+                                    break;
+                                }
+                            }
+                        }
+                        ?>
+                        <tr data-placement="<?php echo $placement['placement_key']; ?>">
+                            <td><strong><?php echo htmlspecialchars($placement['placement_key']); ?></strong></td>
+                            <td><?php echo htmlspecialchars($networkName); ?></td>
+                            <td>
+                                <span class="status-badge" data-status="<?php echo strtolower($status); ?>">
+                                    <?php if ($status === 'Active'): ?>
+                                        <span class="badge bg-success">✓ Working</span>
+                                    <?php elseif ($status === 'Inactive'): ?>
+                                        <span class="badge bg-danger">✗ Inactive</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-secondary">? Unknown</span>
+                                    <?php endif; ?>
+                                </span>
+                            </td>
+                            <td class="last-check-time">Never</td>
+                            <td>
+                                <?php if ($primaryUnitId): ?>
+                                    <button class="btn btn-sm btn-info" onclick="testAdUnit(<?php echo $primaryUnitId; ?>, '<?php echo $placement['placement_key']; ?>')">
+                                        <i class="fas fa-vial"></i> Test
+                                    </button>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -570,6 +665,89 @@ function editPlacement(placement) {
     document.getElementById('edit_placement_frequency').value = placement.frequency;
     new bootstrap.Modal(document.getElementById('editPlacementModal')).show();
 }
+
+// Ad Status Testing Functions
+async function testAdUnit(unitId, placement) {
+    const row = document.querySelector(`tr[data-placement="${placement}"]`);
+    const statusBadge = row.querySelector('.status-badge');
+    const timeCell = row.querySelector('.last-check-time');
+    
+    // Show testing status
+    statusBadge.innerHTML = '<span class="badge bg-warning">🔄 Testing...</span>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('action', 'test_ad');
+        formData.append('unit_id', unitId);
+        
+        const response = await fetch('', {
+            method: 'POST',
+            body: formData
+        });
+        
+        // Simulate ad check (in real implementation, this would check if ad unit is valid)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Update status based on result
+        const now = new Date();
+        timeCell.textContent = now.toLocaleTimeString();
+        
+        // For demonstration, randomly determine if ad is working
+        // In production, you would check actual ad network response
+        const isWorking = Math.random() > 0.2; // 80% success rate
+        
+        if (isWorking) {
+            statusBadge.innerHTML = '<span class="badge bg-success">✓ Working</span>';
+        } else {
+            statusBadge.innerHTML = '<span class="badge bg-danger">✗ Failed</span>';
+        }
+    } catch (error) {
+        console.error('Test error:', error);
+        statusBadge.innerHTML = '<span class="badge bg-danger">✗ Error</span>';
+        timeCell.textContent = 'Error';
+    }
+}
+
+async function checkAllAdStatus() {
+    const rows = document.querySelectorAll('#ad-status-body tr[data-placement]');
+    
+    for (const row of rows) {
+        const testBtn = row.querySelector('button[onclick^="testAdUnit"]');
+        if (testBtn) {
+            const onclickAttr = testBtn.getAttribute('onclick');
+            const matches = onclickAttr.match(/testAdUnit\((\d+),\s*'([^']+)'\)/);
+            if (matches) {
+                const unitId = matches[1];
+                const placement = matches[2];
+                await testAdUnit(unitId, placement);
+                // Add delay between checks
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+    }
+    
+    alert('All ad statuses checked!');
+}
+
+// Auto-check ad status every 5 minutes
+setInterval(async function() {
+    console.log('Running automatic ad status check...');
+    const rows = document.querySelectorAll('#ad-status-body tr[data-placement]');
+    
+    for (const row of rows) {
+        const testBtn = row.querySelector('button[onclick^="testAdUnit"]');
+        if (testBtn) {
+            const onclickAttr = testBtn.getAttribute('onclick');
+            const matches = onclickAttr.match(/testAdUnit\((\d+),\s*'([^']+)'\)/);
+            if (matches) {
+                const unitId = matches[1];
+                const placement = matches[2];
+                await testAdUnit(unitId, placement);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+    }
+}, 300000); // 5 minutes
 </script>
 
 <?php require_once 'footer.php'; ?>

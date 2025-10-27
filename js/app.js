@@ -172,6 +172,13 @@ async function sendTaps(taps) {
             userData.energy = data.energy;
             updateBalance();
             updateEnergy();
+            
+            // Check if ad should be shown (forced)
+            if (data.show_ad) {
+                await showAd('tap', () => {
+                    showNotification('Ad completed! Keep tapping!', 'success');
+                });
+            }
         }
     } catch (error) {
         console.error('Tap error:', error);
@@ -515,8 +522,15 @@ function renderWallet(data) {
         const option = document.createElement('option');
         option.value = method.name;
         option.textContent = method.name;
+        option.dataset.fields = method.fields_required;
         methodSelect.appendChild(option);
     });
+    
+    // Add "Enter Manually" option
+    const manualOption = document.createElement('option');
+    manualOption.value = 'manual';
+    manualOption.textContent = '✍️ Enter Manually';
+    methodSelect.appendChild(manualOption);
     
     // Render withdrawal history
     const container = document.getElementById('withdrawal-list');
@@ -539,18 +553,66 @@ function renderWallet(data) {
     });
 }
 
+// Handle payment method change to show appropriate fields
+document.getElementById('payment-method').addEventListener('change', function() {
+    const fieldsContainer = document.getElementById('payment-fields');
+    const selectedOption = this.options[this.selectedIndex];
+    const method = this.value;
+    
+    fieldsContainer.innerHTML = '';
+    
+    if (method === 'manual') {
+        // Show manual entry fields
+        fieldsContainer.innerHTML = `
+            <div class="form-group">
+                <label>Payment Method Name</label>
+                <input type="text" name="method_name" placeholder="e.g., PayPal, Bank, Crypto" required>
+            </div>
+            <div class="form-group">
+                <label>Wallet Address / Account Details</label>
+                <textarea name="wallet_details" rows="3" placeholder="Enter your wallet address, account number, or payment details" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Additional Information (Optional)</label>
+                <input type="text" name="additional_info" placeholder="Network, IFSC code, etc.">
+            </div>
+        `;
+    } else if (method && selectedOption.dataset.fields) {
+        // Show predefined fields based on payment method
+        const fields = selectedOption.dataset.fields.split(',');
+        fields.forEach(field => {
+            const fieldName = field.trim();
+            const label = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            fieldsContainer.innerHTML += `
+                <div class="form-group">
+                    <label>${label}</label>
+                    <input type="text" name="${fieldName}" placeholder="${label}" required>
+                </div>
+            `;
+        });
+    }
+});
+
 // Withdrawal form
 document.getElementById('withdrawal-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const amount = parseFloat(document.getElementById('withdrawal-amount').value);
-    const method = document.getElementById('payment-method').value;
+    let method = document.getElementById('payment-method').value;
     
     // Collect payment details based on method
     const paymentDetails = {};
-    document.querySelectorAll('#payment-fields input').forEach(input => {
-        paymentDetails[input.name] = input.value;
+    document.querySelectorAll('#payment-fields input, #payment-fields textarea').forEach(input => {
+        if (input.value) {
+            paymentDetails[input.name] = input.value;
+        }
     });
+    
+    // If manual entry, use the custom method name
+    if (method === 'manual') {
+        method = paymentDetails.method_name || 'Manual Entry';
+        delete paymentDetails.method_name;
+    }
     
     try {
         const response = await fetch(`${API_URL}/wallet.php`, {
@@ -568,6 +630,7 @@ document.getElementById('withdrawal-form').addEventListener('submit', async (e) 
         if (data.success) {
             showNotification('Withdrawal request submitted!', 'success');
             document.getElementById('withdrawal-form').reset();
+            document.getElementById('payment-fields').innerHTML = '';
             await loadWallet();
         } else {
             showNotification(data.error, 'error');
@@ -654,8 +717,42 @@ function updateSpinUI(data) {
 }
 
 document.getElementById('btn-spin').addEventListener('click', async () => {
-    // Implement spin wheel animation and API call
-    showNotification('Spin feature coming soon!', 'info');
+    const spinBtn = document.getElementById('btn-spin');
+    spinBtn.disabled = true;
+    
+    try {
+        // First show the ad
+        await showAd('spin', async () => {
+            // Then perform the spin
+            const response = await fetch(`${API_URL}/spin.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userData.id,
+                    double_reward: false
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                userData.coins = data.total_coins;
+                updateBalance();
+                
+                showNotification(`🎉 You won ${data.reward} coins! Block: ${data.block}`, 'success');
+                
+                // Refresh spin availability
+                await checkSpinAvailability();
+            } else {
+                showNotification(data.error || 'Spin failed', 'error');
+                spinBtn.disabled = false;
+            }
+        });
+    } catch (error) {
+        console.error('Spin error:', error);
+        showNotification('Spin failed. Please try again.', 'error');
+        spinBtn.disabled = false;
+    }
 });
 
 // Notifications
