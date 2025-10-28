@@ -13,8 +13,15 @@ require_once 'config.php';
 $content = file_get_contents("php://input");
 $update = json_decode($content, true);
 
-// Log incoming updates for debugging (remove in production)
-error_log("Bot Update: " . $content);
+// Log incoming updates for debugging
+error_log("Bot Update Received: " . $content);
+
+// Validate update
+if (!$update) {
+    error_log("Bot Error: Invalid JSON in update");
+    http_response_code(200); // Always return 200 to Telegram
+    exit;
+}
 
 // Extract message or callback query
 $message = $update['message'] ?? null;
@@ -25,6 +32,8 @@ $username = $message['from']['username'] ?? $callback_query['from']['username'] 
 $first_name = $message['from']['first_name'] ?? $callback_query['from']['first_name'] ?? 'User';
 
 if (!$chat_id) {
+    error_log("Bot Error: No chat_id found in update");
+    http_response_code(200);
     exit;
 }
 
@@ -389,7 +398,16 @@ function sendMessage($chat_id, $text, $keyboard = null) {
         $data['reply_markup'] = json_encode($keyboard);
     }
     
-    return sendTelegramRequest('sendMessage', $data);
+    error_log("Sending message to chat_id: $chat_id");
+    $result = sendTelegramRequest('sendMessage', $data);
+    
+    if (!$result || !$result['ok']) {
+        error_log("Failed to send message: " . json_encode($result));
+    } else {
+        error_log("Message sent successfully");
+    }
+    
+    return $result;
 }
 
 /**
@@ -415,14 +433,27 @@ function sendTelegramRequest($method, $data) {
         'http' => [
             'header' => "Content-type: application/x-www-form-urlencoded\r\n",
             'method' => 'POST',
-            'content' => http_build_query($data)
+            'content' => http_build_query($data),
+            'ignore_errors' => true
         ]
     ];
     
     $context = stream_context_create($options);
-    $result = file_get_contents($url, false, $context);
+    $result = @file_get_contents($url, false, $context);
     
-    return json_decode($result, true);
+    if ($result === false) {
+        error_log("Telegram API Error: Failed to connect to $url");
+        return ['ok' => false, 'description' => 'Failed to connect to Telegram API'];
+    }
+    
+    $response = json_decode($result, true);
+    
+    if (!$response) {
+        error_log("Telegram API Error: Invalid JSON response: $result");
+        return ['ok' => false, 'description' => 'Invalid response from Telegram API'];
+    }
+    
+    return $response;
 }
 
 ?>
