@@ -832,6 +832,8 @@ function renderLeaderboard(data) {
 let spinBlocks = [];
 let wheelCanvas = null;
 let wheelCtx = null;
+let currentRotation = 0;
+let isSpinning = false;
 
 async function checkSpinAvailability() {
     try {
@@ -851,7 +853,7 @@ async function checkSpinAvailability() {
     }
 }
 
-function drawSpinWheel() {
+function drawSpinWheel(rotation = 0) {
     if (!wheelCanvas) {
         wheelCanvas = document.getElementById('wheel-canvas');
         if (!wheelCanvas) {
@@ -873,6 +875,12 @@ function drawSpinWheel() {
     // Clear canvas
     wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height);
     
+    // Save context and apply rotation
+    wheelCtx.save();
+    wheelCtx.translate(centerX, centerY);
+    wheelCtx.rotate(rotation);
+    wheelCtx.translate(-centerX, -centerY);
+    
     // Define vibrant colors for blocks
     const colors = [
         '#FF6B6B', '#4ECDC4', '#FFD93D', '#95E1D3',
@@ -881,8 +889,6 @@ function drawSpinWheel() {
     
     const totalBlocks = spinBlocks.length;
     const anglePerBlock = (2 * Math.PI) / totalBlocks;
-    
-    console.log(`Drawing wheel with ${totalBlocks} blocks:`, spinBlocks.map(b => b.block_label).join(', '));
     
     // Draw each segment
     spinBlocks.forEach((block, index) => {
@@ -922,7 +928,10 @@ function drawSpinWheel() {
         wheelCtx.restore();
     });
     
-    // Draw center circle
+    // Restore context before drawing center circle
+    wheelCtx.restore();
+    
+    // Draw center circle (not rotated)
     wheelCtx.beginPath();
     wheelCtx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
     
@@ -936,8 +945,6 @@ function drawSpinWheel() {
     wheelCtx.strokeStyle = '#333333';
     wheelCtx.lineWidth = 3;
     wheelCtx.stroke();
-    
-    console.log('✅ Spin wheel successfully drawn with', totalBlocks, 'blocks');
 }
 
 function updateSpinUI(data) {
@@ -959,14 +966,88 @@ function updateSpinUI(data) {
     }
 }
 
+async function animateSpinWheel(winningBlock) {
+    return new Promise((resolve) => {
+        if (isSpinning) return;
+        isSpinning = true;
+        
+        // Find the index of the winning block
+        const winningIndex = spinBlocks.findIndex(b => b.block_label === winningBlock);
+        if (winningIndex === -1) {
+            console.error('Winning block not found:', winningBlock);
+            isSpinning = false;
+            resolve();
+            return;
+        }
+        
+        const totalBlocks = spinBlocks.length;
+        const anglePerBlock = (2 * Math.PI) / totalBlocks;
+        
+        // Calculate target angle (pointer is at top, so we need to rotate to align winning block with top)
+        // Winning block should end up at the top (pointer position)
+        const targetBlockAngle = (winningIndex * anglePerBlock) + (anglePerBlock / 2);
+        const minSpins = 5; // Minimum full rotations
+        const randomExtra = Math.random() * Math.PI * 2; // Random extra rotation
+        const targetRotation = (minSpins * Math.PI * 2) + targetBlockAngle + randomExtra;
+        
+        // Animation parameters
+        const duration = 5000; // 5 seconds
+        const startTime = Date.now();
+        const startRotation = currentRotation;
+        
+        console.log('Starting spin animation:', {
+            winningBlock,
+            winningIndex,
+            targetRotation: (targetRotation * 180 / Math.PI).toFixed(2) + '°',
+            duration: duration + 'ms'
+        });
+        
+        function animate() {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Easing function for smooth deceleration
+            const easeOut = 1 - Math.pow(1 - progress, 4);
+            
+            currentRotation = startRotation + (targetRotation * easeOut);
+            drawSpinWheel(currentRotation);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                isSpinning = false;
+                console.log('✅ Spin animation completed');
+                resolve();
+            }
+        }
+        
+        requestAnimationFrame(animate);
+    });
+}
+
 document.getElementById('btn-spin').addEventListener('click', async () => {
     const spinBtn = document.getElementById('btn-spin');
+    const spinInfo = document.getElementById('spin-info');
+    
+    if (isSpinning) {
+        showNotification('Please wait for the current spin to complete', 'warning');
+        return;
+    }
+    
     spinBtn.disabled = true;
+    const originalText = spinInfo.textContent;
+    spinInfo.textContent = '📺 Please watch the ad first...';
     
     try {
-        // First show the ad
+        console.log('🎬 Showing ad before spin...');
+        
+        // First show the ad - the spin will NOT start until ad is completed
         await showAd('spin', async () => {
-            // Then perform the spin
+            console.log('✅ Ad completed, now performing spin...');
+            spinInfo.textContent = '🎰 Spinning...';
+            
+            // Get the spin result from server
             const response = await fetch(`${API_URL}/spin.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -979,6 +1060,12 @@ document.getElementById('btn-spin').addEventListener('click', async () => {
             const data = await response.json();
             
             if (data.success) {
+                console.log('🎯 Spin result received:', data.block);
+                
+                // Animate the wheel to the winning block
+                await animateSpinWheel(data.block);
+                
+                // Update user data
                 userData.coins = data.total_coins;
                 updateBalance();
                 
@@ -998,12 +1085,14 @@ document.getElementById('btn-spin').addEventListener('click', async () => {
             } else {
                 showNotification(data.error || 'Spin failed', 'error');
                 spinBtn.disabled = false;
+                spinInfo.textContent = originalText;
             }
         });
     } catch (error) {
         console.error('Spin error:', error);
         showNotification('Spin failed. Please try again.', 'error');
         spinBtn.disabled = false;
+        spinInfo.textContent = originalText;
     }
 });
 

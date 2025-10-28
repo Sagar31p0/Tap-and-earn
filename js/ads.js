@@ -167,14 +167,19 @@ const AdManager = {
     async show(placement, onComplete) {
         await this.init();
         
+        console.log(`🎬 AdManager: Requesting ad for placement: ${placement}`);
+        
         // Get ad configuration from server
         const adConfig = await this.getAdConfig(placement);
         
         if (!adConfig) {
-            console.warn('No ad config found for placement:', placement);
+            console.warn('⚠️ No ad config found for placement:', placement);
+            console.log('⏭️ Skipping ad, continuing with action...');
             if (onComplete) onComplete();
             return;
         }
+        
+        console.log(`📺 AdManager: Showing ${adConfig.network} ad...`);
         
         // Log impression
         await this.logEvent(placement, adConfig.ad_unit.id, 'impression');
@@ -201,25 +206,30 @@ const AdManager = {
             // Log completion
             await this.logEvent(placement, adConfig.ad_unit.id, 'complete');
             
-            // Call completion callback
+            console.log('✅ Ad completed successfully');
+            
+            // Call completion callback - THIS IS WHERE THE SPIN HAPPENS
             if (onComplete) {
+                console.log('🎯 Executing post-ad callback...');
                 await onComplete();
             }
         } catch (error) {
-            console.error('Ad display error:', error);
+            console.error('❌ Ad display error:', error);
             
             // Try fallback if available
             if (adConfig.fallback && adConfig.fallback.length > 0) {
-                console.log('Trying fallback ad...');
+                console.log('🔄 Trying fallback ad...');
                 const fallback = adConfig.fallback[0];
                 try {
                     await this[`show${fallback.network.charAt(0).toUpperCase() + fallback.network.slice(1)}`](fallback.ad_unit);
                     if (onComplete) await onComplete();
                 } catch (fallbackError) {
-                    console.error('Fallback ad error:', fallbackError);
+                    console.error('❌ Fallback ad error:', fallbackError);
+                    console.log('⏭️ Continuing without ad...');
                     if (onComplete) onComplete(); // Still call callback
                 }
             } else {
+                console.log('⏭️ No fallback available, continuing without ad...');
                 if (onComplete) onComplete(); // Call callback even if ad fails
             }
         }
