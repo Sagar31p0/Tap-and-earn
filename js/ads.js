@@ -48,21 +48,32 @@ const AdManager = {
     async showAdexium(adUnit) {
         return new Promise((resolve, reject) => {
             try {
-                const widget = new AdexiumWidget({
-                    wid: adUnit.id,
-                    adFormat: adUnit.type || 'interstitial'
-                });
-                
-                // Show the ad
-                widget.show();
-                
-                // Simulate completion (Adexium should have callbacks in real implementation)
-                setTimeout(() => {
+                if (typeof AdexiumWidget !== 'undefined') {
+                    const widget = new AdexiumWidget({
+                        wid: adUnit.id,
+                        adFormat: adUnit.type || 'interstitial',
+                        onComplete: () => {
+                            console.log('Adexium ad completed');
+                            resolve();
+                        },
+                        onError: (error) => {
+                            console.error('Adexium error:', error);
+                            resolve(); // Resolve anyway to not block flow
+                        },
+                        onClose: () => {
+                            console.log('Adexium ad closed');
+                            resolve();
+                        }
+                    });
+                    
+                    widget.show();
+                } else {
+                    console.warn('Adexium SDK not loaded');
                     resolve();
-                }, 3000);
+                }
             } catch (error) {
                 console.error('Adexium error:', error);
-                reject(error);
+                resolve(); // Changed from reject to resolve
             }
         });
     },
@@ -100,14 +111,22 @@ const AdManager = {
     async showAdsgram(adUnit) {
         return new Promise((resolve, reject) => {
             try {
-                // Adsgram implementation for Telegram
-                // This would use Adsgram's SDK which is Telegram-specific
-                console.log('Showing Adsgram ad:', adUnit.id);
-                
-                // Simulate ad display
-                setTimeout(() => {
+                // Adsgram SDK for Telegram Mini Apps
+                if (window.Adsgram) {
+                    const AdController = window.Adsgram.init({ blockId: adUnit.id });
+                    
+                    AdController.show().then(() => {
+                        console.log('Adsgram ad completed:', adUnit.id);
+                        resolve();
+                    }).catch((error) => {
+                        console.error('Adsgram error:', error);
+                        // Resolve anyway to not block the flow
+                        resolve();
+                    });
+                } else {
+                    console.warn('Adsgram SDK not loaded');
                     resolve();
-                }, 2000);
+                }
             } catch (error) {
                 console.error('Adsgram error:', error);
                 resolve();
@@ -118,17 +137,22 @@ const AdManager = {
     async showRichads(adUnit) {
         return new Promise((resolve, reject) => {
             try {
-                if (this.networks.richads) {
+                if (this.networks.richads && window.TelegramAdsController) {
                     // Show based on unit type
                     const unitId = parseInt(adUnit.id.replace('#', ''));
                     
-                    // Richads implementation
                     console.log('Showing Richads ad:', unitId);
                     
-                    // Simulate ad display
-                    setTimeout(() => {
-                        resolve();
-                    }, 2000);
+                    // Use Richads SDK
+                    this.networks.richads.showAd(unitId)
+                        .then(() => {
+                            console.log('Richads ad completed');
+                            resolve();
+                        })
+                        .catch((error) => {
+                            console.error('Richads display error:', error);
+                            resolve();
+                        });
                 } else {
                     console.error('Richads not initialized');
                     resolve();

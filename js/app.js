@@ -577,6 +577,77 @@ document.getElementById('payment-method').addEventListener('change', function() 
                 <input type="text" name="additional_info" placeholder="Network, IFSC code, etc.">
             </div>
         `;
+    } else if (method === 'Crypto') {
+        // Show crypto-specific fields with coin and network selection
+        fieldsContainer.innerHTML = `
+            <div class="form-group">
+                <label>Select Cryptocurrency</label>
+                <select name="crypto_coin" id="crypto-coin" required>
+                    <option value="">Choose coin...</option>
+                    <option value="USDT">USDT (Tether)</option>
+                    <option value="Bitcoin">Bitcoin (BTC)</option>
+                    <option value="Ethereum">Ethereum (ETH)</option>
+                    <option value="BNB">BNB (Binance Coin)</option>
+                    <option value="USDC">USDC</option>
+                    <option value="TRX">TRON (TRX)</option>
+                </select>
+            </div>
+            <div class="form-group" id="network-group" style="display: none;">
+                <label>Select Network</label>
+                <select name="crypto_network" id="crypto-network" required>
+                    <option value="">Choose network...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Wallet Address</label>
+                <input type="text" name="wallet_address" placeholder="Enter your wallet address" required>
+            </div>
+            <div class="form-group">
+                <label>Memo/Tag (if required)</label>
+                <input type="text" name="memo" placeholder="Optional">
+            </div>
+        `;
+        
+        // Add event listener for crypto coin selection to show networks
+        document.getElementById('crypto-coin').addEventListener('change', function() {
+            const networkGroup = document.getElementById('network-group');
+            const networkSelect = document.getElementById('crypto-network');
+            const coin = this.value;
+            
+            networkSelect.innerHTML = '<option value="">Choose network...</option>';
+            
+            if (coin === 'USDT') {
+                networkGroup.style.display = 'block';
+                networkSelect.innerHTML += `
+                    <option value="TRC20">TRC20 (TRON)</option>
+                    <option value="ERC20">ERC20 (Ethereum)</option>
+                    <option value="BEP20">BEP20 (BSC)</option>
+                    <option value="Polygon">Polygon (MATIC)</option>
+                `;
+                networkSelect.required = true;
+            } else if (coin === 'Ethereum' || coin === 'USDC') {
+                networkGroup.style.display = 'block';
+                networkSelect.innerHTML += `
+                    <option value="ERC20">ERC20 (Ethereum)</option>
+                    <option value="BEP20">BEP20 (BSC)</option>
+                    <option value="Polygon">Polygon (MATIC)</option>
+                `;
+                networkSelect.required = true;
+            } else if (coin === 'BNB') {
+                networkGroup.style.display = 'block';
+                networkSelect.innerHTML += `
+                    <option value="BEP20">BEP20 (BSC)</option>
+                    <option value="BEP2">BEP2 (Binance Chain)</option>
+                `;
+                networkSelect.required = true;
+            } else if (coin === 'Bitcoin' || coin === 'TRX') {
+                networkGroup.style.display = 'none';
+                networkSelect.required = false;
+            } else {
+                networkGroup.style.display = 'none';
+                networkSelect.required = false;
+            }
+        });
     } else if (method && selectedOption.dataset.fields) {
         // Show predefined fields based on payment method
         const fields = selectedOption.dataset.fields.split(',');
