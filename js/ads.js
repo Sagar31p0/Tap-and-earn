@@ -9,6 +9,9 @@ const AdManager = {
         adsgram: null,
         richads: null
     },
+    currentPlacement: null,
+    currentCallback: null,
+    maxRetries: 3,
     
     async init() {
         if (this.initialized) return;
@@ -27,6 +30,60 @@ const AdManager = {
             this.initialized = true;
         } catch (error) {
             console.error('Ad initialization error:', error);
+        }
+    },
+    
+    showLoadingOverlay(message = 'Ad Loading...') {
+        let overlay = document.getElementById('ad-loading-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'ad-loading-overlay';
+            overlay.innerHTML = `
+                <div class="ad-loading-content">
+                    <div class="ad-loading-spinner"></div>
+                    <div class="ad-loading-text">📺 Ad Loading...</div>
+                    <div class="ad-loading-subtext">Please wait while we load the ad</div>
+                    <div class="ad-loading-message">This is required to continue</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        overlay.classList.add('show');
+    },
+    
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('ad-loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+    },
+    
+    showErrorOverlay(error, retryCallback) {
+        let overlay = document.getElementById('ad-loading-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'ad-loading-overlay';
+            document.body.appendChild(overlay);
+        }
+        
+        overlay.innerHTML = `
+            <div class="ad-loading-content ad-error-content">
+                <div class="ad-error-icon">⚠️</div>
+                <div class="ad-error-text">Ad Failed to Load</div>
+                <div class="ad-loading-subtext">${error || 'Unable to load advertisement'}</div>
+                <div class="ad-loading-message">Ad is required to continue this action</div>
+                <button class="ad-retry-btn" onclick="AdManager.retryAd()">
+                    🔄 Retry Ad
+                </button>
+            </div>
+        `;
+        overlay.classList.add('show');
+    },
+    
+    async retryAd() {
+        if (this.currentPlacement && this.currentCallback) {
+            this.hideLoadingOverlay();
+            await this.show(this.currentPlacement, this.currentCallback);
         }
     },
     
@@ -49,31 +106,46 @@ const AdManager = {
         return new Promise((resolve, reject) => {
             try {
                 if (typeof AdexiumWidget !== 'undefined') {
+                    let adCompleted = false;
+                    
                     const widget = new AdexiumWidget({
                         wid: adUnit.id,
                         adFormat: adUnit.type || 'interstitial',
                         onComplete: () => {
                             console.log('Adexium ad completed');
+                            adCompleted = true;
                             resolve();
                         },
                         onError: (error) => {
                             console.error('Adexium error:', error);
-                            resolve(); // Resolve anyway to not block flow
+                            if (!adCompleted) {
+                                reject(new Error('Adexium ad failed to load: ' + error));
+                            }
                         },
                         onClose: () => {
                             console.log('Adexium ad closed');
-                            resolve();
+                            if (adCompleted) {
+                                resolve();
+                            } else {
+                                reject(new Error('Adexium ad closed without completion'));
+                            }
                         }
                     });
                     
                     widget.show();
+                    
+                    // Timeout after 30 seconds
+                    setTimeout(() => {
+                        if (!adCompleted) {
+                            reject(new Error('Adexium ad timeout'));
+                        }
+                    }, 30000);
                 } else {
-                    console.warn('Adexium SDK not loaded');
-                    resolve();
+                    reject(new Error('Adexium SDK not loaded'));
                 }
             } catch (error) {
                 console.error('Adexium error:', error);
-                resolve(); // Changed from reject to resolve
+                reject(error);
             }
         });
     },
@@ -92,18 +164,23 @@ const AdManager = {
                             everyPage: false
                         }
                     }).then(() => {
+                        console.log('Monetag ad completed');
                         resolve();
                     }).catch((error) => {
                         console.error('Monetag error:', error);
-                        resolve(); // Resolve anyway to not block flow
+                        reject(new Error('Monetag ad failed: ' + error));
                     });
+                    
+                    // Timeout after 30 seconds
+                    setTimeout(() => {
+                        reject(new Error('Monetag ad timeout'));
+                    }, 30000);
                 } else {
-                    console.error('Monetag SDK not loaded');
-                    resolve();
+                    reject(new Error('Monetag SDK not loaded'));
                 }
             } catch (error) {
                 console.error('Monetag error:', error);
-                resolve();
+                reject(error);
             }
         });
     },
@@ -120,16 +197,19 @@ const AdManager = {
                         resolve();
                     }).catch((error) => {
                         console.error('Adsgram error:', error);
-                        // Resolve anyway to not block the flow
-                        resolve();
+                        reject(new Error('Adsgram ad failed: ' + error));
                     });
+                    
+                    // Timeout after 30 seconds
+                    setTimeout(() => {
+                        reject(new Error('Adsgram ad timeout'));
+                    }, 30000);
                 } else {
-                    console.warn('Adsgram SDK not loaded');
-                    resolve();
+                    reject(new Error('Adsgram SDK not loaded'));
                 }
             } catch (error) {
                 console.error('Adsgram error:', error);
-                resolve();
+                reject(error);
             }
         });
     },
@@ -151,87 +231,151 @@ const AdManager = {
                         })
                         .catch((error) => {
                             console.error('Richads display error:', error);
-                            resolve();
+                            reject(new Error('Richads ad failed: ' + error));
                         });
+                    
+                    // Timeout after 30 seconds
+                    setTimeout(() => {
+                        reject(new Error('Richads ad timeout'));
+                    }, 30000);
                 } else {
-                    console.error('Richads not initialized');
-                    resolve();
+                    reject(new Error('Richads not initialized or SDK not loaded'));
                 }
             } catch (error) {
                 console.error('Richads error:', error);
-                resolve();
+                reject(error);
             }
         });
     },
     
-    async show(placement, onComplete) {
+    async show(placement, onComplete, isRetry = false) {
         await this.init();
+        
+        // Store for retry functionality
+        this.currentPlacement = placement;
+        this.currentCallback = onComplete;
         
         console.log(`🎬 AdManager: Requesting ad for placement: ${placement}`);
         
-        // Get ad configuration from server
-        const adConfig = await this.getAdConfig(placement);
-        
-        if (!adConfig) {
-            console.warn('⚠️ No ad config found for placement:', placement);
-            console.log('⏭️ Skipping ad, continuing with action...');
-            if (onComplete) onComplete();
-            return;
-        }
-        
-        console.log(`📺 AdManager: Showing ${adConfig.network} ad...`);
-        
-        // Log impression
-        await this.logEvent(placement, adConfig.ad_unit.id, 'impression');
+        // Show loading overlay
+        this.showLoadingOverlay();
         
         try {
-            // Show ad based on network
-            switch (adConfig.network) {
-                case 'adexium':
-                    await this.showAdexium(adConfig.ad_unit);
-                    break;
-                case 'monetag':
-                    await this.showMonetag(adConfig.ad_unit);
-                    break;
-                case 'adsgram':
-                    await this.showAdsgram(adConfig.ad_unit);
-                    break;
-                case 'richads':
-                    await this.showRichads(adConfig.ad_unit);
-                    break;
-                default:
-                    console.warn('Unknown ad network:', adConfig.network);
+            // Get ad configuration from server
+            const adConfig = await this.getAdConfig(placement);
+            
+            if (!adConfig) {
+                console.error('⚠️ No ad config found for placement:', placement);
+                this.hideLoadingOverlay();
+                this.showErrorOverlay('No ad configuration found. Please setup ads in admin panel.');
+                return; // DO NOT proceed without ad!
             }
             
-            // Log completion
-            await this.logEvent(placement, adConfig.ad_unit.id, 'complete');
+            console.log(`📺 AdManager: Showing ${adConfig.network} ad...`);
             
-            console.log('✅ Ad completed successfully');
+            // Log impression
+            await this.logEvent(placement, adConfig.ad_unit.id, 'impression');
             
-            // Call completion callback - THIS IS WHERE THE SPIN HAPPENS
-            if (onComplete) {
-                console.log('🎯 Executing post-ad callback...');
-                await onComplete();
-            }
-        } catch (error) {
-            console.error('❌ Ad display error:', error);
+            let adShown = false;
+            let lastError = null;
             
-            // Try fallback if available
-            if (adConfig.fallback && adConfig.fallback.length > 0) {
-                console.log('🔄 Trying fallback ad...');
-                const fallback = adConfig.fallback[0];
-                try {
-                    await this[`show${fallback.network.charAt(0).toUpperCase() + fallback.network.slice(1)}`](fallback.ad_unit);
-                    if (onComplete) await onComplete();
-                } catch (fallbackError) {
-                    console.error('❌ Fallback ad error:', fallbackError);
-                    console.log('⏭️ Continuing without ad...');
-                    if (onComplete) onComplete(); // Still call callback
+            // Try primary ad
+            try {
+                switch (adConfig.network) {
+                    case 'adexium':
+                        await this.showAdexium(adConfig.ad_unit);
+                        break;
+                    case 'monetag':
+                        await this.showMonetag(adConfig.ad_unit);
+                        break;
+                    case 'adsgram':
+                        await this.showAdsgram(adConfig.ad_unit);
+                        break;
+                    case 'richads':
+                        await this.showRichads(adConfig.ad_unit);
+                        break;
+                    default:
+                        throw new Error('Unknown ad network: ' + adConfig.network);
                 }
-            } else {
-                console.log('⏭️ No fallback available, continuing without ad...');
-                if (onComplete) onComplete(); // Call callback even if ad fails
+                
+                adShown = true;
+                
+                // Log completion
+                await this.logEvent(placement, adConfig.ad_unit.id, 'complete');
+                
+                console.log('✅ Ad completed successfully');
+                
+                // Hide loading and execute callback
+                this.hideLoadingOverlay();
+                
+                if (onComplete) {
+                    console.log('🎯 Executing post-ad callback...');
+                    await onComplete();
+                }
+                
+            } catch (error) {
+                console.error('❌ Primary ad error:', error);
+                lastError = error;
+                
+                // Try fallback ads
+                if (adConfig.fallback && adConfig.fallback.length > 0) {
+                    console.log('🔄 Trying fallback ads...');
+                    
+                    for (const fallback of adConfig.fallback) {
+                        try {
+                            console.log(`Trying fallback: ${fallback.network}`);
+                            
+                            switch (fallback.network) {
+                                case 'adexium':
+                                    await this.showAdexium(fallback.ad_unit);
+                                    break;
+                                case 'monetag':
+                                    await this.showMonetag(fallback.ad_unit);
+                                    break;
+                                case 'adsgram':
+                                    await this.showAdsgram(fallback.ad_unit);
+                                    break;
+                                case 'richads':
+                                    await this.showRichads(fallback.ad_unit);
+                                    break;
+                            }
+                            
+                            adShown = true;
+                            console.log('✅ Fallback ad completed successfully');
+                            
+                            // Hide loading and execute callback
+                            this.hideLoadingOverlay();
+                            
+                            if (onComplete) {
+                                await onComplete();
+                            }
+                            
+                            break; // Exit loop if fallback succeeds
+                            
+                        } catch (fallbackError) {
+                            console.error('❌ Fallback ad error:', fallbackError);
+                            lastError = fallbackError;
+                            continue; // Try next fallback
+                        }
+                    }
+                }
             }
+            
+            // If no ad was shown successfully, show error
+            if (!adShown) {
+                this.hideLoadingOverlay();
+                this.showErrorOverlay(
+                    lastError?.message || 'Failed to load any advertisement. Please check your connection and try again.'
+                );
+                console.error('❌ All ads failed to load. User MUST watch ad to continue.');
+                // DO NOT call onComplete - user must retry!
+            }
+            
+        } catch (error) {
+            console.error('❌ Critical ad error:', error);
+            this.hideLoadingOverlay();
+            this.showErrorOverlay(error.message || 'An error occurred while loading the ad');
+            // DO NOT proceed without ad!
         }
     },
     

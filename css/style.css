@@ -742,6 +742,105 @@ body {
     flex: 1;
 }
 
+/* Ad Loading Overlay */
+#ad-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#ad-loading-overlay.show {
+    display: flex;
+    animation: fadeIn 0.3s;
+}
+
+.ad-loading-content {
+    text-align: center;
+    color: white;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    max-width: 90%;
+}
+
+.ad-loading-spinner {
+    width: 80px;
+    height: 80px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
+    border-top: 6px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.ad-loading-text {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.ad-loading-subtext {
+    font-size: 16px;
+    opacity: 0.8;
+    margin-bottom: 20px;
+}
+
+.ad-loading-message {
+    font-size: 14px;
+    opacity: 0.6;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.ad-error-content {
+    text-align: center;
+    color: white;
+}
+
+.ad-error-icon {
+    font-size: 60px;
+    margin-bottom: 20px;
+    color: #ef4444;
+}
+
+.ad-error-text {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.ad-retry-btn {
+    margin-top: 20px;
+    padding: 15px 40px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 15px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    transition: all 0.3s;
+}
+
+.ad-retry-btn:active {
+    transform: scale(0.95);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .referral-stats {
@@ -751,5 +850,17 @@ body {
     .wheel-container {
         width: 300px;
         height: 300px;
+    }
+    
+    .ad-loading-content {
+        padding: 30px 20px;
+    }
+    
+    .ad-loading-text {
+        font-size: 20px;
+    }
+    
+    .ad-loading-subtext {
+        font-size: 14px;
     }
 }
