@@ -59,13 +59,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             }
         }
         
+        // Get active spin blocks for display
+        $stmt = $db->prepare("SELECT block_label, reward_value, probability FROM spin_config WHERE is_active = 1 ORDER BY sort_order");
+        $stmt->execute();
+        $blocks = $stmt->fetchAll();
+        
         jsonResponse([
             'success' => true,
             'can_spin' => $canSpin,
             'spins_today' => (int)$userSpins['spins_today'],
             'daily_limit' => $dailyLimit,
             'next_spin_time' => $nextSpinTime,
-            'reason' => $reason
+            'reason' => $reason,
+            'blocks' => $blocks
         ]);
         
     } catch (Exception $e) {
