@@ -1,38 +1,49 @@
-Bot Issues & Feature Requests
+Telegram Bot Issues & Fix Requirements
 
-1. Tap Section:
+1. Start Command (/start):
 
-The “Rich Ads” ad is appearing — add an option in the Admin Panel to change the ad network for this section.
+The /start command is not responding.
 
-Also, add a Tap Ad Frequency control in the Admin Panel where I can set how often the ad should appear.
+Create a professional welcome/start message with inline buttons (e.g., “🎯 Tap & Earn”, “🎡 Spin”, “💰 Wallet”, “⚙️ Help”).
 
-Once the frequency is set (e.g., every 3 taps), the ad must appear strictly as per that setting (forced behavior).
-
+Ensure the start message loads instantly when a new user starts or restarts the bot.
 
 
 
 2. Spin Section:
 
-The Spin Block is currently not visible in the bot — please check and fix this issue.
+The spin blocks are not visible inside the Spin tab.
 
-Also, add an option in the Admin Panel to change the ad network for the Spin section.
+When a user tries to spin, it shows: “⚠️ Spin feature coming soon!” — please fix this issue so the spin feature works correctly.
+
+Verify that the spin logic, rewards, and limits are connected to the database properly.
+
+Screenshot attached for reference.
 
 
 
 3. Wallet Section:
 
-Currently, users can only select wallet details — please add an option to manually enter wallet details as well.
+Currently, users can select withdrawal amount and method, but they cannot fill details (like UPI ID, wallet address, etc.).
+
+Add a feature to manually enter withdrawal details.
+
+Include options for Crypto Coin and Network selection (e.g., USDT - TRC20 / ERC20, Bitcoin, Ethereum).
 
 
 
+4. Ad Network Issue:
+
+Only RichAds ads are being shown — no other ad network is displaying ads.
+
+However, in the Admin Panel, it shows all ad networks as “working.”
+
+Please check the ad integration logic and ensure other ad networks (like adsgram, manetag, adexium etc.) are also visible in rotation or as configured.
 
 
----
 
-Admin Panel Improvements
+5. Database Update:
 
-1. In the Ads Management section:
+The updated database file (attached) contains the new ad units and settings.
 
-Add a “Check Ad Status” or “Test Ad” option to verify whether the ads are working correctly.
-
-Implement a system to automatically check and display ad status across all bot functions (e.g., Tap, Spin, Wallet) — showing whether each ad is active, working, or failed.
+Please verify that all new fields (like ad units, frequency, and network IDs) are correctly mapped and functional.
