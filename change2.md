@@ -46,4 +46,5 @@ Please check the ad integration logic and ensure other ad networks (like adsgram
 
 The updated database file (attached) contains the new ad units and settings.
 
-Please verify that all new fields (like ad units, frequency, and network IDs) are correctly mapped and functional.
+Please verify that all new fields (like ad units, frequency, and network IDs) are correctly mapped and functional. 
+database.sql file check.
