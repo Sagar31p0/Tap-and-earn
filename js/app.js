@@ -275,6 +275,11 @@ function navigateTo(screenName) {
     });
     
     currentScreen = screenName;
+    
+    // Redraw spin wheel when navigating to spin screen
+    if (screenName === 'spin' && spinBlocks.length > 0) {
+        setTimeout(() => drawSpinWheel(), 100);
+    }
 }
 
 // Tasks
@@ -824,17 +829,115 @@ function renderLeaderboard(data) {
 }
 
 // Spin Wheel
+let spinBlocks = [];
+let wheelCanvas = null;
+let wheelCtx = null;
+
 async function checkSpinAvailability() {
     try {
         const response = await fetch(`${API_URL}/spin.php?user_id=${userData.id}`);
         const data = await response.json();
         
         if (data.success) {
+            // Store blocks for wheel rendering
+            if (data.blocks && data.blocks.length > 0) {
+                spinBlocks = data.blocks;
+                drawSpinWheel();
+            }
             updateSpinUI(data);
         }
     } catch (error) {
         console.error('Check spin error:', error);
     }
+}
+
+function drawSpinWheel() {
+    if (!wheelCanvas) {
+        wheelCanvas = document.getElementById('wheel-canvas');
+        if (!wheelCanvas) {
+            console.error('Wheel canvas not found!');
+            return;
+        }
+        wheelCtx = wheelCanvas.getContext('2d');
+    }
+    
+    if (!spinBlocks || spinBlocks.length === 0) {
+        console.warn('No spin blocks available to draw');
+        return;
+    }
+    
+    const centerX = wheelCanvas.width / 2;
+    const centerY = wheelCanvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 10;
+    
+    // Clear canvas
+    wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height);
+    
+    // Define vibrant colors for blocks
+    const colors = [
+        '#FF6B6B', '#4ECDC4', '#FFD93D', '#95E1D3',
+        '#F38181', '#6C5CE7', '#A8E6CF', '#FF8B94'
+    ];
+    
+    const totalBlocks = spinBlocks.length;
+    const anglePerBlock = (2 * Math.PI) / totalBlocks;
+    
+    console.log(`Drawing wheel with ${totalBlocks} blocks:`, spinBlocks.map(b => b.block_label).join(', '));
+    
+    // Draw each segment
+    spinBlocks.forEach((block, index) => {
+        const startAngle = index * anglePerBlock - Math.PI / 2;
+        const endAngle = startAngle + anglePerBlock;
+        
+        // Draw segment
+        wheelCtx.beginPath();
+        wheelCtx.moveTo(centerX, centerY);
+        wheelCtx.arc(centerX, centerY, radius, startAngle, endAngle);
+        wheelCtx.closePath();
+        
+        // Fill with color
+        wheelCtx.fillStyle = colors[index % colors.length];
+        wheelCtx.fill();
+        
+        // Draw border
+        wheelCtx.strokeStyle = '#ffffff';
+        wheelCtx.lineWidth = 3;
+        wheelCtx.stroke();
+        
+        // Draw text
+        wheelCtx.save();
+        wheelCtx.translate(centerX, centerY);
+        wheelCtx.rotate(startAngle + anglePerBlock / 2);
+        wheelCtx.textAlign = 'center';
+        wheelCtx.textBaseline = 'middle';
+        wheelCtx.fillStyle = '#ffffff';
+        wheelCtx.font = 'bold 20px Arial';
+        wheelCtx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        wheelCtx.shadowBlur = 5;
+        
+        // Draw block label
+        wheelCtx.fillText(block.block_label, radius * 0.65, 0);
+        
+        wheelCtx.shadowBlur = 0;
+        wheelCtx.restore();
+    });
+    
+    // Draw center circle
+    wheelCtx.beginPath();
+    wheelCtx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
+    
+    // Add gradient to center
+    const gradient = wheelCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 25);
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(1, '#f0f0f0');
+    wheelCtx.fillStyle = gradient;
+    wheelCtx.fill();
+    
+    wheelCtx.strokeStyle = '#333333';
+    wheelCtx.lineWidth = 3;
+    wheelCtx.stroke();
+    
+    console.log('✅ Spin wheel successfully drawn with', totalBlocks, 'blocks');
 }
 
 function updateSpinUI(data) {
