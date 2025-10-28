@@ -121,7 +121,14 @@ function updateEnergy() {
 const tapCoin = document.getElementById('tap-coin');
 const tapCounter = document.getElementById('tap-counter');
 
+let isTappingBlocked = false;
+
 tapCoin.addEventListener('click', async (e) => {
+    if (isTappingBlocked) {
+        showNotification('Please watch the ad to continue tapping!', 'warning');
+        return;
+    }
+    
     if (userData.energy <= 0) {
         showNotification('No energy left! Watch an ad to recharge', 'warning');
         return;
@@ -175,7 +182,16 @@ async function sendTaps(taps) {
             
             // Check if ad should be shown (forced)
             if (data.show_ad) {
+                // Block tapping until ad is watched
+                isTappingBlocked = true;
+                tapCoin.style.opacity = '0.5';
+                tapCoin.style.cursor = 'not-allowed';
+                
                 await showAd('tap', () => {
+                    // Unblock tapping after ad completion
+                    isTappingBlocked = false;
+                    tapCoin.style.opacity = '1';
+                    tapCoin.style.cursor = 'pointer';
                     showNotification('Ad completed! Keep tapping!', 'success');
                 });
             }
@@ -356,10 +372,13 @@ async function verifyTask(taskId) {
         
         const data = await response.json();
         if (data.success) {
-            userData.coins = data.total_coins;
-            updateBalance();
-            showNotification(`+${data.reward} coins earned!`, 'success');
-            await loadTasks();
+            // Show ad after task verification
+            await showAd('task_verify', async () => {
+                userData.coins = data.total_coins;
+                updateBalance();
+                showNotification(`+${data.reward} coins earned!`, 'success');
+                await loadTasks();
+            });
         } else {
             showNotification(data.error, 'error');
         }
@@ -516,15 +535,27 @@ async function loadWallet() {
 function renderWallet(data) {
     // Render payment methods
     const methodSelect = document.getElementById('payment-method');
+    if (!methodSelect) {
+        console.error('Payment method select element not found');
+        return;
+    }
+    
     methodSelect.innerHTML = '<option value="">Select method...</option>';
     
-    data.payment_methods.forEach(method => {
-        const option = document.createElement('option');
-        option.value = method.name;
-        option.textContent = method.name;
-        option.dataset.fields = method.fields_required;
-        methodSelect.appendChild(option);
-    });
+    // Log for debugging
+    console.log('Payment methods:', data.payment_methods);
+    
+    if (data.payment_methods && data.payment_methods.length > 0) {
+        data.payment_methods.forEach(method => {
+            const option = document.createElement('option');
+            option.value = method.name;
+            option.textContent = method.name;
+            option.dataset.fields = method.fields_required || '';
+            methodSelect.appendChild(option);
+        });
+    } else {
+        console.warn('No payment methods available');
+    }
     
     // Add "Enter Manually" option
     const manualOption = document.createElement('option');
@@ -559,7 +590,20 @@ document.getElementById('payment-method').addEventListener('change', function() 
     const selectedOption = this.options[this.selectedIndex];
     const method = this.value;
     
+    console.log('Payment method selected:', method);
+    
+    if (!fieldsContainer) {
+        console.error('Payment fields container not found');
+        return;
+    }
+    
     fieldsContainer.innerHTML = '';
+    
+    if (!method || method === '') {
+        // No method selected, show helper text
+        fieldsContainer.innerHTML = '<p style="color: #888; font-size: 14px; margin-top: 10px;">Please select a payment method to continue</p>';
+        return;
+    }
     
     if (method === 'manual') {
         // Show manual entry fields
@@ -650,18 +694,43 @@ document.getElementById('payment-method').addEventListener('change', function() 
         });
     } else if (method && selectedOption.dataset.fields) {
         // Show predefined fields based on payment method
-        const fields = selectedOption.dataset.fields.split(',');
-        fields.forEach(field => {
-            const fieldName = field.trim();
-            const label = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            fieldsContainer.innerHTML += `
+        const fieldsStr = selectedOption.dataset.fields.trim();
+        console.log('Fields for method:', fieldsStr);
+        
+        if (fieldsStr) {
+            const fields = fieldsStr.split(',');
+            fields.forEach(field => {
+                const fieldName = field.trim();
+                if (fieldName) {
+                    const label = fieldName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    fieldsContainer.innerHTML += `
+                        <div class="form-group">
+                            <label>${label}</label>
+                            <input type="text" name="${fieldName}" placeholder="Enter ${label.toLowerCase()}" required>
+                        </div>
+                    `;
+                }
+            });
+        } else {
+            // No fields defined, show generic field
+            fieldsContainer.innerHTML = `
                 <div class="form-group">
-                    <label>${label}</label>
-                    <input type="text" name="${fieldName}" placeholder="${label}" required>
+                    <label>Account Details</label>
+                    <textarea name="account_details" rows="3" placeholder="Enter your ${method} account details" required></textarea>
                 </div>
             `;
-        });
+        }
+    } else {
+        // Fallback for methods without defined fields
+        fieldsContainer.innerHTML = `
+            <div class="form-group">
+                <label>Account Details</label>
+                <textarea name="account_details" rows="3" placeholder="Enter your ${method} account details" required></textarea>
+            </div>
+        `;
     }
+    
+    console.log('Payment fields rendered');
 });
 
 // Withdrawal form
@@ -810,7 +879,16 @@ document.getElementById('btn-spin').addEventListener('click', async () => {
                 userData.coins = data.total_coins;
                 updateBalance();
                 
-                showNotification(`🎉 You won ${data.reward} coins! Block: ${data.block}`, 'success');
+                // Show detailed spin result with block information
+                const blockEmoji = getBlockEmoji(data.block);
+                showNotification(`🎉 Congratulations!\n\n${blockEmoji} Block: ${data.block}\n💰 Reward: ${data.reward} coins`, 'success');
+                
+                // Also log to console for debugging
+                console.log('Spin Result:', {
+                    block: data.block,
+                    reward: data.reward,
+                    total_coins: data.total_coins
+                });
                 
                 // Refresh spin availability
                 await checkSpinAvailability();
@@ -833,4 +911,27 @@ function showNotification(message, type = 'info') {
 
 function showError(message) {
     tg.showAlert(message);
+}
+
+// Helper function to get emoji for spin blocks
+function getBlockEmoji(blockLabel) {
+    const emojiMap = {
+        '10': '🎯',
+        '20': '🎲',
+        '50': '🎰',
+        '100': '💎',
+        '200': '🌟',
+        '500': '⭐',
+        '1000': '🏆',
+        'JACKPOT': '💰'
+    };
+    
+    // Try to find exact match or partial match
+    for (const [key, emoji] of Object.entries(emojiMap)) {
+        if (blockLabel.includes(key)) {
+            return emoji;
+        }
+    }
+    
+    return '🎁'; // Default emoji
 }
