@@ -1,3 +1,100 @@
+<?php
+// Handle AJAX request first, before any HTML output
+if (isset($_GET['action']) && $_GET['action'] === 'fix') {
+    header('Content-Type: application/json');
+    
+    try {
+        require_once 'config.php';
+        $db = Database::getInstance()->getConnection();
+        $db->beginTransaction();
+        
+        $changes = [];
+        
+        // Fix 1: Tap ad frequency
+        $stmt = $db->prepare("UPDATE settings SET setting_value = '2', updated_at = NOW() WHERE setting_key = 'tap_ad_frequency'");
+        $stmt->execute();
+        $changes[] = "Tap ad frequency: 5 → 2 taps";
+        
+        // Fix 2: Spin daily limit
+        $stmt = $db->prepare("UPDATE settings SET setting_value = '500', updated_at = NOW() WHERE setting_key = 'spin_daily_limit'");
+        $stmt->execute();
+        $changes[] = "Spin daily limit: 10 → 500 spins";
+        
+        // Fix 3: Tap placement frequency
+        $stmt = $db->prepare("UPDATE ad_placements SET frequency = 2 WHERE placement_key = 'tap'");
+        $stmt->execute();
+        $changes[] = "Tap placement frequency: 5 → 2";
+        
+        // Fix 4: Create Watch Ad task
+        $stmt = $db->prepare("SELECT id FROM tasks WHERE url = '#watch-ad' AND ad_network = 'adsgram'");
+        $stmt->execute();
+        $existingTask = $stmt->fetch();
+        
+        if (!$existingTask) {
+            $stmt = $db->prepare("
+                INSERT INTO tasks (title, description, url, reward, icon, type, is_active, sort_order, ad_network, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                'Watch Ad & Earn',
+                'Watch a video advertisement and earn coins instantly',
+                '#watch-ad',
+                50.00,
+                'fas fa-video',
+                'daily',
+                1,
+                1,
+                'adsgram'
+            ]);
+            $changes[] = "Created new 'Watch Ad' task with Adsgram";
+        } else {
+            $changes[] = "Watch Ad task already exists (no change needed)";
+        }
+        
+        // Fix 5: Enable all ad networks
+        $stmt = $db->prepare("UPDATE ad_networks SET is_enabled = 1 WHERE name IN ('adexium', 'monetag', 'adsgram', 'richads')");
+        $stmt->execute();
+        $changes[] = "Enabled all ad networks (Adexium, Monetag, Adsgram, Richads)";
+        
+        // Fix 6: Activate critical ad units
+        $stmt = $db->prepare("UPDATE ad_units SET is_active = 1 WHERE id IN (1, 2, 3, 4, 5, 6, 7)");
+        $stmt->execute();
+        $changes[] = "Activated all configured ad units";
+        
+        $db->commit();
+        
+        // Verification
+        $verification = '<table>';
+        $verification .= '<tr><th>Setting</th><th>Value</th></tr>';
+        
+        $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('tap_ad_frequency', 'spin_daily_limit', 'spin_interval_minutes')");
+        $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($settings as $setting) {
+            $label = ucwords(str_replace('_', ' ', $setting['setting_key']));
+            $verification .= "<tr><td>{$label}</td><td><strong>{$setting['setting_value']}</strong></td></tr>";
+        }
+        
+        $verification .= '</table>';
+        
+        echo json_encode([
+            'success' => true,
+            'changes' => $changes,
+            'verification' => $verification
+        ]);
+        
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -245,100 +342,3 @@
     </script>
 </body>
 </html>
-
-<?php
-if (isset($_GET['action']) && $_GET['action'] === 'fix') {
-    header('Content-Type: application/json');
-    
-    try {
-        require_once 'config.php';
-        $db = Database::getInstance()->getConnection();
-        $db->beginTransaction();
-        
-        $changes = [];
-        
-        // Fix 1: Tap ad frequency
-        $stmt = $db->prepare("UPDATE settings SET setting_value = '2', updated_at = NOW() WHERE setting_key = 'tap_ad_frequency'");
-        $stmt->execute();
-        $changes[] = "Tap ad frequency: 5 → 2 taps";
-        
-        // Fix 2: Spin daily limit
-        $stmt = $db->prepare("UPDATE settings SET setting_value = '500', updated_at = NOW() WHERE setting_key = 'spin_daily_limit'");
-        $stmt->execute();
-        $changes[] = "Spin daily limit: 10 → 500 spins";
-        
-        // Fix 3: Tap placement frequency
-        $stmt = $db->prepare("UPDATE ad_placements SET frequency = 2 WHERE placement_key = 'tap'");
-        $stmt->execute();
-        $changes[] = "Tap placement frequency: 5 → 2";
-        
-        // Fix 4: Create Watch Ad task
-        $stmt = $db->prepare("SELECT id FROM tasks WHERE url = '#watch-ad' AND ad_network = 'adsgram'");
-        $stmt->execute();
-        $existingTask = $stmt->fetch();
-        
-        if (!$existingTask) {
-            $stmt = $db->prepare("
-                INSERT INTO tasks (title, description, url, reward, icon, type, is_active, sort_order, ad_network, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-            ");
-            $stmt->execute([
-                'Watch Ad & Earn',
-                'Watch a video advertisement and earn coins instantly',
-                '#watch-ad',
-                50.00,
-                'fas fa-video',
-                'daily',
-                1,
-                1,
-                'adsgram'
-            ]);
-            $changes[] = "Created new 'Watch Ad' task with Adsgram";
-        } else {
-            $changes[] = "Watch Ad task already exists (no change needed)";
-        }
-        
-        // Fix 5: Enable all ad networks
-        $stmt = $db->prepare("UPDATE ad_networks SET is_enabled = 1 WHERE name IN ('adexium', 'monetag', 'adsgram', 'richads')");
-        $stmt->execute();
-        $changes[] = "Enabled all ad networks (Adexium, Monetag, Adsgram, Richads)";
-        
-        // Fix 6: Activate critical ad units
-        $stmt = $db->prepare("UPDATE ad_units SET is_active = 1 WHERE id IN (1, 2, 3, 4, 5, 6, 7)");
-        $stmt->execute();
-        $changes[] = "Activated all configured ad units";
-        
-        $db->commit();
-        
-        // Verification
-        $verification = '<table>';
-        $verification .= '<tr><th>Setting</th><th>Value</th></tr>';
-        
-        $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('tap_ad_frequency', 'spin_daily_limit', 'spin_interval_minutes')");
-        $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        foreach ($settings as $setting) {
-            $label = ucwords(str_replace('_', ' ', $setting['setting_key']));
-            $verification .= "<tr><td>{$label}</td><td><strong>{$setting['setting_value']}</strong></td></tr>";
-        }
-        
-        $verification .= '</table>';
-        
-        echo json_encode([
-            'success' => true,
-            'changes' => $changes,
-            'verification' => $verification
-        ]);
-        
-    } catch (Exception $e) {
-        if (isset($db) && $db->inTransaction()) {
-            $db->rollBack();
-        }
-        echo json_encode([
-            'success' => false,
-            'error' => $e->getMessage()
-        ]);
-    }
-    exit;
-}
-?>
