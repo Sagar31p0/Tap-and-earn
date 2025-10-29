@@ -23,6 +23,18 @@ if (!$telegramId) {
 }
 
 try {
+    // Test database connection first
+    try {
+        $db->query("SELECT 1");
+    } catch (Exception $e) {
+        error_log("Database connection test failed: " . $e->getMessage());
+        jsonResponse([
+            'success' => false, 
+            'error' => 'Database connection failed',
+            'details' => 'Unable to connect to database. Please contact administrator.'
+        ], 500);
+    }
+    
     // Check if user exists
     $stmt = $db->prepare("SELECT * FROM users WHERE telegram_id = ?");
     $stmt->execute([$telegramId]);
@@ -30,16 +42,31 @@ try {
     
     if ($user) {
         // Update last active
-        $stmt = $db->prepare("UPDATE users SET last_active = NOW() WHERE id = ?");
-        $stmt->execute([$user['id']]);
+        try {
+            $stmt = $db->prepare("UPDATE users SET last_active = NOW() WHERE id = ?");
+            $stmt->execute([$user['id']]);
+        } catch (Exception $e) {
+            error_log("Failed to update last_active: " . $e->getMessage());
+            // Continue anyway, not critical
+        }
         
         // Update energy
-        updateUserEnergy($user['id']);
+        try {
+            updateUserEnergy($user['id']);
+        } catch (Exception $e) {
+            error_log("Failed to update energy: " . $e->getMessage());
+            // Continue anyway, not critical
+        }
         
         // Get user stats
-        $stmt = $db->prepare("SELECT * FROM user_stats WHERE user_id = ?");
-        $stmt->execute([$user['id']]);
-        $stats = $stmt->fetch();
+        try {
+            $stmt = $db->prepare("SELECT * FROM user_stats WHERE user_id = ?");
+            $stmt->execute([$user['id']]);
+            $stats = $stmt->fetch();
+        } catch (Exception $e) {
+            error_log("Failed to get user stats: " . $e->getMessage());
+            $stats = null;
+        }
         
         // Get updated user data
         $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
@@ -70,31 +97,55 @@ try {
         // Create new user
         $newReferralCode = generateReferralCode();
         
-        $stmt = $db->prepare("INSERT INTO users (telegram_id, username, first_name, last_name, referral_code) 
-                             VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$telegramId, $username, $firstName, $lastName, $newReferralCode]);
-        $userId = $db->lastInsertId();
+        try {
+            $stmt = $db->prepare("INSERT INTO users (telegram_id, username, first_name, last_name, referral_code) 
+                                 VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$telegramId, $username, $firstName, $lastName, $newReferralCode]);
+            $userId = $db->lastInsertId();
+        } catch (Exception $e) {
+            error_log("Failed to create user: " . $e->getMessage());
+            jsonResponse([
+                'success' => false, 
+                'error' => 'Failed to create user account',
+                'details' => $e->getMessage()
+            ], 500);
+        }
         
-        // Create user stats
-        $stmt = $db->prepare("INSERT INTO user_stats (user_id) VALUES (?)");
-        $stmt->execute([$userId]);
+        // Create user stats (optional, skip if fails)
+        try {
+            $stmt = $db->prepare("INSERT INTO user_stats (user_id) VALUES (?)");
+            $stmt->execute([$userId]);
+        } catch (Exception $e) {
+            error_log("Failed to create user stats: " . $e->getMessage());
+            // Continue, not critical
+        }
         
-        // Create user spins record
-        $stmt = $db->prepare("INSERT INTO user_spins (user_id) VALUES (?)");
-        $stmt->execute([$userId]);
+        // Create user spins record (optional, skip if fails)
+        try {
+            $stmt = $db->prepare("INSERT INTO user_spins (user_id) VALUES (?)");
+            $stmt->execute([$userId]);
+        } catch (Exception $e) {
+            error_log("Failed to create user spins: " . $e->getMessage());
+            // Continue, not critical
+        }
         
-        // Handle referral
+        // Handle referral (optional, skip if fails)
         if ($referralCode) {
-            $stmt = $db->prepare("SELECT id FROM users WHERE referral_code = ?");
-            $stmt->execute([$referralCode]);
-            $referrer = $stmt->fetch();
-            
-            if ($referrer) {
-                $stmt = $db->prepare("UPDATE users SET referred_by = ? WHERE id = ?");
-                $stmt->execute([$referrer['id'], $userId]);
+            try {
+                $stmt = $db->prepare("SELECT id FROM users WHERE referral_code = ?");
+                $stmt->execute([$referralCode]);
+                $referrer = $stmt->fetch();
                 
-                $stmt = $db->prepare("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)");
-                $stmt->execute([$referrer['id'], $userId]);
+                if ($referrer) {
+                    $stmt = $db->prepare("UPDATE users SET referred_by = ? WHERE id = ?");
+                    $stmt->execute([$referrer['id'], $userId]);
+                    
+                    $stmt = $db->prepare("INSERT INTO referrals (referrer_id, referred_id) VALUES (?, ?)");
+                    $stmt->execute([$referrer['id'], $userId]);
+                }
+            } catch (Exception $e) {
+                error_log("Failed to handle referral: " . $e->getMessage());
+                // Continue, not critical
             }
         }
         
@@ -125,8 +176,19 @@ try {
             ]
         ]);
     }
+} catch (PDOException $e) {
+    error_log("Auth Database Error: " . $e->getMessage());
+    jsonResponse([
+        'success' => false, 
+        'error' => 'Database error occurred',
+        'details' => 'Error: ' . $e->getMessage()
+    ], 500);
 } catch (Exception $e) {
     error_log("Auth Error: " . $e->getMessage());
-    jsonResponse(['success' => false, 'error' => 'Authentication failed'], 500);
+    jsonResponse([
+        'success' => false, 
+        'error' => 'Authentication failed',
+        'details' => $e->getMessage()
+    ], 500);
 }
 ?>

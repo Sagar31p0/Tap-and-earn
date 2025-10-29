@@ -19,9 +19,10 @@ session_start();
 // Timezone
 date_default_timezone_set('UTC');
 
-// Error Reporting (disable in production)
+// Error Reporting
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+// Enable error display for debugging (set to 0 in production)
+ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/error.log');
 
@@ -49,6 +50,9 @@ class Database {
     
     private function __construct() {
         try {
+            // Log connection attempt
+            error_log("Attempting database connection to: " . DB_HOST . " / " . DB_NAME);
+            
             $this->conn = new PDO(
                 "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
                 DB_USER,
@@ -56,12 +60,23 @@ class Database {
                 array(
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_TIMEOUT => 5 // 5 second timeout
                 )
             );
+            
+            error_log("Database connection successful");
         } catch(PDOException $e) {
-            error_log("Database Connection Error: " . $e->getMessage());
-            die(json_encode(['success' => false, 'error' => 'Database connection failed']));
+            $errorMsg = "Database Connection Error: " . $e->getMessage();
+            error_log($errorMsg);
+            
+            // Return detailed error in development
+            die(json_encode([
+                'success' => false, 
+                'error' => 'Database connection failed',
+                'details' => 'Host: ' . DB_HOST . ', DB: ' . DB_NAME . ', Error: ' . $e->getMessage(),
+                'hint' => 'Please check database credentials in config.php'
+            ]));
         }
     }
     

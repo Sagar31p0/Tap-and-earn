@@ -23,55 +23,72 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function initializeApp() {
-    // Get Telegram user data
-    const initData = tg.initDataUnsafe;
-    const user = initData.user;
-    
-    if (!user) {
-        showError('Please open this app from Telegram');
-        return;
-    }
-    
-    // Check for referral code
-    const urlParams = new URLSearchParams(window.location.search);
-    const refCode = urlParams.get('ref');
-    
-    // Authenticate user
-    const authData = {
-        telegram_id: user.id,
-        username: user.username || '',
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        referral_code: refCode
-    };
-    
-    const response = await fetch(`${API_URL}/auth.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authData)
-    });
-    
-    const data = await response.json();
-    
-    if (data.success) {
-        userData = data.user;
-        updateUI();
-        hideLoading();
+    try {
+        // Get Telegram user data
+        const initData = tg.initDataUnsafe;
+        const user = initData.user;
         
-        // Load initial data
-        await Promise.all([
-            loadTasks(),
-            loadGames(),
-            loadReferrals(),
-            loadWallet(),
-            checkSpinAvailability(),
-            loadLeaderboard()
-        ]);
+        console.log('Initializing app...', { user });
         
-        // Start energy recharge timer
-        startEnergyRecharge();
-    } else {
-        showError('Authentication failed');
+        if (!user) {
+            showError('Please open this app from Telegram');
+            return;
+        }
+        
+        // Check for referral code
+        const urlParams = new URLSearchParams(window.location.search);
+        const refCode = urlParams.get('ref');
+        
+        // Authenticate user
+        const authData = {
+            telegram_id: user.id,
+            username: user.username || '',
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            referral_code: refCode
+        };
+        
+        console.log('Authenticating user...', { telegram_id: user.id });
+        
+        const response = await fetch(`${API_URL}/auth.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(authData)
+        });
+        
+        const data = await response.json();
+        
+        console.log('Auth response:', data);
+        
+        if (data.success) {
+            userData = data.user;
+            updateUI();
+            hideLoading();
+            
+            // Load initial data
+            await Promise.all([
+                loadTasks(),
+                loadGames(),
+                loadReferrals(),
+                loadWallet(),
+                checkSpinAvailability(),
+                loadLeaderboard()
+            ]);
+            
+            // Start energy recharge timer
+            startEnergyRecharge();
+        } else {
+            // Show detailed error message
+            let errorMsg = data.error || 'Authentication failed';
+            if (data.details) {
+                errorMsg += '\n\nDetails: ' + data.details;
+            }
+            console.error('Authentication failed:', data);
+            showError(errorMsg);
+        }
+    } catch (error) {
+        console.error('Initialization error:', error);
+        showError('Failed to initialize app: ' + error.message);
     }
 }
 
