@@ -17,20 +17,84 @@ const AdManager = {
         if (this.initialized) return;
         
         try {
+            // Wait for ad SDKs to load
+            await this.waitForSDKs();
+            
             // Initialize Richads
             if (window.TelegramAdsController) {
-                this.networks.richads = new TelegramAdsController();
-                this.networks.richads.initialize({
-                    pubId: "820238",
-                    appId: "4130"
-                });
-                console.log('Richads initialized');
+                try {
+                    this.networks.richads = new TelegramAdsController();
+                    this.networks.richads.initialize({
+                        pubId: "820238",
+                        appId: "4130"
+                    });
+                    console.log('✅ Richads initialized');
+                } catch (error) {
+                    console.error('❌ Richads initialization failed:', error);
+                }
+            } else {
+                console.warn('⚠️ Richads SDK not available');
+            }
+            
+            // Check Adsgram SDK
+            if (window.Adsgram) {
+                console.log('✅ Adsgram SDK available');
+            } else {
+                console.warn('⚠️ Adsgram SDK not available');
+            }
+            
+            // Check Adexium SDK
+            if (window.AdexiumWidget) {
+                console.log('✅ Adexium SDK available');
+            } else {
+                console.warn('⚠️ Adexium SDK not available');
+            }
+            
+            // Check Monetag SDK
+            if (typeof show_10055887 === 'function') {
+                console.log('✅ Monetag SDK available');
+            } else {
+                console.warn('⚠️ Monetag SDK not available');
             }
             
             this.initialized = true;
+            console.log('🎬 AdManager initialized successfully');
         } catch (error) {
-            console.error('Ad initialization error:', error);
+            console.error('❌ Ad initialization error:', error);
+            this.initialized = true; // Still mark as initialized to allow attempts
         }
+    },
+    
+    async waitForSDKs() {
+        // Wait up to 5 seconds for SDKs to load
+        const maxWait = 5000;
+        const startTime = Date.now();
+        
+        return new Promise((resolve) => {
+            const checkSDKs = () => {
+                const adsgramReady = !!window.Adsgram;
+                const adexiumReady = !!window.AdexiumWidget;
+                const monetagReady = typeof show_10055887 === 'function';
+                const richadsReady = !!window.TelegramAdsController;
+                
+                if (adsgramReady && adexiumReady && monetagReady && richadsReady) {
+                    console.log('✅ All ad SDKs loaded');
+                    resolve();
+                } else if (Date.now() - startTime >= maxWait) {
+                    console.warn('⚠️ Timeout waiting for ad SDKs. Available:', {
+                        adsgram: adsgramReady,
+                        adexium: adexiumReady,
+                        monetag: monetagReady,
+                        richads: richadsReady
+                    });
+                    resolve(); // Proceed anyway
+                } else {
+                    setTimeout(checkSDKs, 100);
+                }
+            };
+            
+            checkSDKs();
+        });
     },
     
     showLoadingOverlay(message = 'Ad Loading...') {
@@ -89,15 +153,25 @@ const AdManager = {
     
     async getAdConfig(placement) {
         try {
+            console.log(`📞 Fetching ad config for placement: ${placement}`);
             const response = await fetch(`${API_URL}/ads.php?placement=${placement}&user_id=${userData.id}`);
+            
+            if (!response.ok) {
+                console.error(`❌ HTTP error: ${response.status} ${response.statusText}`);
+                return null;
+            }
+            
             const data = await response.json();
+            console.log('📦 Ad config received:', data);
             
             if (data.success) {
                 return data;
+            } else {
+                console.error('❌ Ad config error:', data.error);
+                return null;
             }
-            return null;
         } catch (error) {
-            console.error('Get ad config error:', error);
+            console.error('❌ Get ad config error:', error);
             return null;
         }
     },
@@ -105,25 +179,37 @@ const AdManager = {
     async showAdexium(adUnit) {
         return new Promise((resolve, reject) => {
             try {
+                console.log('🎬 Attempting to show Adexium ad:', adUnit);
+                
                 if (typeof AdexiumWidget !== 'undefined') {
                     let adCompleted = false;
+                    let widgetId = adUnit.id;
+                    
+                    // Extract widget ID if it's embedded in code
+                    if (widgetId && widgetId.includes('wid:')) {
+                        const match = widgetId.match(/wid:\s*['"]([^'"]+)['"]/i);
+                        if (match && match[1]) {
+                            widgetId = match[1];
+                            console.log('📝 Extracted Adexium widget ID:', widgetId);
+                        }
+                    }
                     
                     const widget = new AdexiumWidget({
-                        wid: adUnit.id,
+                        wid: widgetId,
                         adFormat: adUnit.type || 'interstitial',
                         onComplete: () => {
-                            console.log('Adexium ad completed');
+                            console.log('✅ Adexium ad completed');
                             adCompleted = true;
                             resolve();
                         },
                         onError: (error) => {
-                            console.error('Adexium error:', error);
+                            console.error('❌ Adexium error:', error);
                             if (!adCompleted) {
                                 reject(new Error('Adexium ad failed to load: ' + error));
                             }
                         },
                         onClose: () => {
-                            console.log('Adexium ad closed');
+                            console.log('🚪 Adexium ad closed');
                             if (adCompleted) {
                                 resolve();
                             } else {
@@ -133,6 +219,7 @@ const AdManager = {
                     });
                     
                     widget.show();
+                    console.log('📺 Adexium ad show() called');
                     
                     // Timeout after 30 seconds
                     setTimeout(() => {
@@ -144,7 +231,7 @@ const AdManager = {
                     reject(new Error('Adexium SDK not loaded'));
                 }
             } catch (error) {
-                console.error('Adexium error:', error);
+                console.error('❌ Adexium critical error:', error);
                 reject(error);
             }
         });
@@ -153,7 +240,11 @@ const AdManager = {
     async showMonetag(adUnit) {
         return new Promise((resolve, reject) => {
             try {
+                console.log('🎬 Attempting to show Monetag ad:', adUnit);
+                
                 if (typeof show_10055887 === 'function') {
+                    let adCompleted = false;
+                    
                     show_10055887({
                         type: adUnit.type || 'inApp',
                         inAppSettings: {
@@ -164,22 +255,29 @@ const AdManager = {
                             everyPage: false
                         }
                     }).then(() => {
-                        console.log('Monetag ad completed');
+                        console.log('✅ Monetag ad completed');
+                        adCompleted = true;
                         resolve();
                     }).catch((error) => {
-                        console.error('Monetag error:', error);
-                        reject(new Error('Monetag ad failed: ' + error));
+                        console.error('❌ Monetag error:', error);
+                        if (!adCompleted) {
+                            reject(new Error('Monetag ad failed: ' + error));
+                        }
                     });
+                    
+                    console.log('📺 Monetag ad show() called');
                     
                     // Timeout after 30 seconds
                     setTimeout(() => {
-                        reject(new Error('Monetag ad timeout'));
+                        if (!adCompleted) {
+                            reject(new Error('Monetag ad timeout'));
+                        }
                     }, 30000);
                 } else {
                     reject(new Error('Monetag SDK not loaded'));
                 }
             } catch (error) {
-                console.error('Monetag error:', error);
+                console.error('❌ Monetag critical error:', error);
                 reject(error);
             }
         });
@@ -188,27 +286,46 @@ const AdManager = {
     async showAdsgram(adUnit) {
         return new Promise((resolve, reject) => {
             try {
+                console.log('🎬 Attempting to show Adsgram ad:', adUnit);
+                
                 // Adsgram SDK for Telegram Mini Apps
                 if (window.Adsgram) {
-                    const AdController = window.Adsgram.init({ blockId: adUnit.id });
+                    let adCompleted = false;
+                    let blockId = adUnit.id;
+                    
+                    // Clean up block ID (remove prefixes like 'int-', 'task-', etc.)
+                    if (blockId && typeof blockId === 'string') {
+                        // Remove common prefixes
+                        blockId = blockId.replace(/^(int-|task-|reward-)/, '');
+                        console.log('📝 Cleaned Adsgram block ID:', blockId);
+                    }
+                    
+                    const AdController = window.Adsgram.init({ blockId: blockId });
+                    console.log('📺 Adsgram controller initialized for block:', blockId);
                     
                     AdController.show().then(() => {
-                        console.log('Adsgram ad completed:', adUnit.id);
+                        console.log('✅ Adsgram ad completed:', blockId);
+                        adCompleted = true;
                         resolve();
                     }).catch((error) => {
-                        console.error('Adsgram error:', error);
-                        reject(new Error('Adsgram ad failed: ' + error));
+                        console.error('❌ Adsgram error:', error);
+                        if (!adCompleted) {
+                            reject(new Error('Adsgram ad failed: ' + (error.message || error)));
+                        }
                     });
                     
                     // Timeout after 30 seconds
                     setTimeout(() => {
-                        reject(new Error('Adsgram ad timeout'));
+                        if (!adCompleted) {
+                            console.warn('⏱️ Adsgram ad timeout');
+                            reject(new Error('Adsgram ad timeout'));
+                        }
                     }, 30000);
                 } else {
                     reject(new Error('Adsgram SDK not loaded'));
                 }
             } catch (error) {
-                console.error('Adsgram error:', error);
+                console.error('❌ Adsgram critical error:', error);
                 reject(error);
             }
         });
@@ -217,32 +334,52 @@ const AdManager = {
     async showRichads(adUnit) {
         return new Promise((resolve, reject) => {
             try {
+                console.log('🎬 Attempting to show Richads ad:', adUnit);
+                
                 if (this.networks.richads && window.TelegramAdsController) {
-                    // Show based on unit type
-                    const unitId = parseInt(adUnit.id.replace('#', ''));
+                    let adCompleted = false;
                     
-                    console.log('Showing Richads ad:', unitId);
+                    // Show based on unit type
+                    let unitId = adUnit.id;
+                    
+                    // Clean up unit ID (remove # prefix if present)
+                    if (typeof unitId === 'string') {
+                        unitId = unitId.replace('#', '');
+                    }
+                    unitId = parseInt(unitId);
+                    
+                    console.log('📝 Richads unit ID:', unitId, 'Type:', adUnit.type);
                     
                     // Use Richads SDK
                     this.networks.richads.showAd(unitId)
                         .then(() => {
-                            console.log('Richads ad completed');
+                            console.log('✅ Richads ad completed');
+                            adCompleted = true;
                             resolve();
                         })
                         .catch((error) => {
-                            console.error('Richads display error:', error);
-                            reject(new Error('Richads ad failed: ' + error));
+                            console.error('❌ Richads display error:', error);
+                            if (!adCompleted) {
+                                reject(new Error('Richads ad failed: ' + (error.message || error)));
+                            }
                         });
+                    
+                    console.log('📺 Richads showAd() called');
                     
                     // Timeout after 30 seconds
                     setTimeout(() => {
-                        reject(new Error('Richads ad timeout'));
+                        if (!adCompleted) {
+                            console.warn('⏱️ Richads ad timeout');
+                            reject(new Error('Richads ad timeout'));
+                        }
                     }, 30000);
                 } else {
-                    reject(new Error('Richads not initialized or SDK not loaded'));
+                    const error = !this.networks.richads ? 'Richads not initialized' : 'TelegramAdsController SDK not loaded';
+                    console.error('❌', error);
+                    reject(new Error(error));
                 }
             } catch (error) {
-                console.error('Richads error:', error);
+                console.error('❌ Richads critical error:', error);
                 reject(error);
             }
         });
@@ -364,10 +501,14 @@ const AdManager = {
             // If no ad was shown successfully, show error
             if (!adShown) {
                 this.hideLoadingOverlay();
+                const errorMessage = lastError?.message || 'Failed to load any advertisement';
+                console.error('❌ All ads failed to load:', errorMessage);
+                console.error('📊 Primary network:', adConfig?.network);
+                console.error('📊 Fallback networks:', adConfig?.fallback?.map(f => f.network).join(', ') || 'None');
+                
                 this.showErrorOverlay(
-                    lastError?.message || 'Failed to load any advertisement. Please check your connection and try again.'
+                    errorMessage + '. Please check your connection and try again.'
                 );
-                console.error('❌ All ads failed to load. User MUST watch ad to continue.');
                 // DO NOT call onComplete - user must retry!
             }
             
