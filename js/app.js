@@ -348,15 +348,26 @@ async function startTask(taskId) {
         
         const data = await response.json();
         if (data.success) {
-            // Show ad first
-            await showAd('task', async () => {
-                // Open URL
-                if (data.url) {
-                    tg.openLink(data.url);
-                }
-                // Reload tasks
-                await loadTasks();
-            });
+            // Check if this is a watch ad task
+            if (data.url === '#watch-ad') {
+                // This is a special watch ad task - show ad directly
+                console.log('🎬 Watch ad task - showing ad directly');
+                await showAd('task_ad', async () => {
+                    // Auto-verify task after ad completion
+                    console.log('✅ Ad completed, verifying task...');
+                    await verifyTask(taskId);
+                });
+            } else {
+                // Regular task - show ad then open URL
+                await showAd('task', async () => {
+                    // Open URL
+                    if (data.url) {
+                        tg.openLink(data.url);
+                    }
+                    // Reload tasks
+                    await loadTasks();
+                });
+            }
         }
     } catch (error) {
         console.error('Start task error:', error);
