@@ -74,11 +74,15 @@ try {
     
     // Check if ad should be shown based on tap frequency
     $tapAdFrequency = (int)getSetting('tap_ad_frequency', 7);
+    
+    // Get current total taps (already updated above)
     $stmt = $db->prepare("SELECT total_taps FROM user_stats WHERE user_id = ?");
     $stmt->execute([$userId]);
-    $totalTaps = $stmt->fetchColumn();
+    $totalTaps = (int)$stmt->fetchColumn();
     
-    $shouldShowAd = ($totalTaps % $tapAdFrequency === 0);
+    // Show ad every N taps (when total_taps is divisible by frequency)
+    // This ensures ads show at predictable intervals: 2, 4, 6, 8, etc. (if frequency=2)
+    $shouldShowAd = ($tapAdFrequency > 0 && $totalTaps > 0 && ($totalTaps % $tapAdFrequency === 0));
     
     // Get updated user data
     $stmt = $db->prepare("SELECT coins, energy FROM users WHERE id = ?");
