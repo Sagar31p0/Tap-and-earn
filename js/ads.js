@@ -247,55 +247,56 @@ const AdManager = {
                 
                 if (typeof show_10113890 === 'function') {
                     let adCompleted = false;
+                    let adShowing = false;
+                    
+                    // Prevent multiple simultaneous ad calls
+                    if (adShowing) {
+                        console.warn('⚠️ Monetag ad already showing, skipping...');
+                        reject(new Error('Monetag ad already in progress'));
+                        return;
+                    }
+                    
+                    adShowing = true;
                     
                     // Determine the ad type based on unit configuration
-                    const adType = adUnit.type || 'inApp';
+                    const adType = adUnit.type || 'interstitial';
+                    
+                    const completeAd = () => {
+                        if (!adCompleted) {
+                            console.log('✅ Monetag ad completed');
+                            adCompleted = true;
+                            adShowing = false;
+                            resolve();
+                        }
+                    };
+                    
+                    const failAd = (error) => {
+                        if (!adCompleted) {
+                            console.error('❌ Monetag error:', error);
+                            adCompleted = true;
+                            adShowing = false;
+                            reject(new Error('Monetag ad failed: ' + (error?.message || error)));
+                        }
+                    };
                     
                     if (adType === 'rewarded') {
-                        // Rewarded ad format
-                        show_10113890().then(() => {
-                            console.log('✅ Monetag rewarded ad completed');
-                            adCompleted = true;
-                            resolve();
-                        }).catch((error) => {
-                            console.error('❌ Monetag rewarded error:', error);
-                            if (!adCompleted) {
-                                reject(new Error('Monetag rewarded ad failed: ' + error));
-                            }
-                        });
-                    } else if (adType === 'interstitial' || adType === 'inApp') {
-                        // In-App Interstitial format
+                        // Rewarded ad format - single shot
+                        show_10113890().then(completeAd).catch(failAd);
+                    } else if (adType === 'interstitial') {
+                        // In-App Interstitial format - single shot, no auto-repeat
                         show_10113890({
                             type: 'inApp',
                             inAppSettings: {
-                                frequency: 1,
-                                capping: 0,
-                                interval: 0,
+                                frequency: 0, // Single shot
+                                capping: 1, // Max 1 ad
+                                interval: 999999, // Very long interval to prevent repeat
                                 timeout: 0,
                                 everyPage: false
                             }
-                        }).then(() => {
-                            console.log('✅ Monetag interstitial ad completed');
-                            adCompleted = true;
-                            resolve();
-                        }).catch((error) => {
-                            console.error('❌ Monetag interstitial error:', error);
-                            if (!adCompleted) {
-                                reject(new Error('Monetag interstitial ad failed: ' + error));
-                            }
-                        });
+                        }).then(completeAd).catch(failAd);
                     } else {
-                        // Default to rewarded popup
-                        show_10113890('pop').then(() => {
-                            console.log('✅ Monetag popup ad completed');
-                            adCompleted = true;
-                            resolve();
-                        }).catch((error) => {
-                            console.error('❌ Monetag popup error:', error);
-                            if (!adCompleted) {
-                                reject(new Error('Monetag popup ad failed: ' + error));
-                            }
-                        });
+                        // Popup format
+                        show_10113890('pop').then(completeAd).catch(failAd);
                     }
                     
                     console.log('📺 Monetag ad show() called with type:', adType);
@@ -303,6 +304,8 @@ const AdManager = {
                     // Timeout after 30 seconds
                     setTimeout(() => {
                         if (!adCompleted) {
+                            console.warn('⏱️ Monetag ad timeout');
+                            adShowing = false;
                             reject(new Error('Monetag ad timeout'));
                         }
                     }, 30000);
@@ -333,29 +336,45 @@ const AdManager = {
                         console.log('📝 Cleaned Adsgram block ID:', blockId);
                     }
                     
-                    const AdController = window.Adsgram.init({ blockId: blockId });
-                    console.log('📺 Adsgram controller initialized for block:', blockId);
-                    
-                    AdController.show().then(() => {
-                        console.log('✅ Adsgram ad completed:', blockId);
-                        adCompleted = true;
-                        resolve();
-                    }).catch((error) => {
-                        console.error('❌ Adsgram error:', error);
-                        if (!adCompleted) {
-                            reject(new Error('Adsgram ad failed: ' + (error.message || error)));
+                    try {
+                        const AdController = window.Adsgram.init({ blockId: blockId });
+                        console.log('📺 Adsgram controller initialized for block:', blockId);
+                        
+                        AdController.show().then(() => {
+                            console.log('✅ Adsgram ad completed:', blockId);
+                            adCompleted = true;
+                            resolve();
+                        }).catch((error) => {
+                            console.error('❌ Adsgram error:', error);
+                            if (!adCompleted) {
+                                // Check for platform URL mismatch error
+                                const errorMsg = error.message || error.toString();
+                                if (errorMsg.includes('Platform App url') || errorMsg.includes('blockId')) {
+                                    reject(new Error(`Adsgram Configuration Error: ${errorMsg}\n\n⚠️ IMPORTANT: You need to configure Adsgram platform with the correct app URL:\n1. Go to Adsgram dashboard\n2. Find block ID: ${blockId}\n3. Set platform app URL to: ${window.location.origin}\n4. Or create a new platform with this URL and get a new block ID`));
+                                } else {
+                                    reject(new Error('Adsgram ad failed: ' + errorMsg));
+                                }
+                            }
+                        });
+                        
+                        // Timeout after 30 seconds
+                        setTimeout(() => {
+                            if (!adCompleted) {
+                                console.warn('⏱️ Adsgram ad timeout');
+                                reject(new Error('Adsgram ad timeout'));
+                            }
+                        }, 30000);
+                    } catch (initError) {
+                        console.error('❌ Adsgram init error:', initError);
+                        const errorMsg = initError.message || initError.toString();
+                        if (errorMsg.includes('Platform App url') || errorMsg.includes('blockId')) {
+                            reject(new Error(`Adsgram Configuration Error: ${errorMsg}\n\n⚠️ IMPORTANT: You need to configure Adsgram platform:\n1. Go to https://adsgram.ai/\n2. Login to your account\n3. Find block ID: ${blockId}\n4. Update platform app URL to: ${window.location.origin}\n5. Or create a new platform with this URL and get a new block ID\n\nCurrent app URL: ${window.location.origin}`));
+                        } else {
+                            reject(new Error('Adsgram initialization failed: ' + errorMsg));
                         }
-                    });
-                    
-                    // Timeout after 30 seconds
-                    setTimeout(() => {
-                        if (!adCompleted) {
-                            console.warn('⏱️ Adsgram ad timeout');
-                            reject(new Error('Adsgram ad timeout'));
-                        }
-                    }, 30000);
+                    }
                 } else {
-                    reject(new Error('Adsgram SDK not loaded'));
+                    reject(new Error('Adsgram SDK not loaded. Make sure Adsgram script is included in HTML.'));
                 }
             } catch (error) {
                 console.error('❌ Adsgram critical error:', error);
