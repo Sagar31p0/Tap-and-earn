@@ -58,9 +58,11 @@ try {
     $referralReward = (float)getSetting('referral_reward', 100);
     $totalEarnings = $approvedReferrals * $referralReward;
     
-    // Get referral link
-    $referralLink = BASE_URL . "/?ref=" . $user['referral_code'];
-    $telegramShareLink = "https://t.me/share/url?url=" . urlencode($referralLink) . "&text=" . urlencode("Join me on this earning platform!");
+    // Get referral link - Use Telegram bot link instead of website
+    $botUsername = str_replace('@', '', BOT_USERNAME);
+    $referralLink = "https://t.me/{$botUsername}?start=" . $user['referral_code'];
+    $shareMessage = "?? Join CoinTap Pro & Start Earning!\n\n";
+    $telegramShareLink = "https://t.me/share/url?url=" . urlencode($referralLink) . "&text=" . urlencode($shareMessage);
     
     jsonResponse([
         'success' => true,
