@@ -4,8 +4,91 @@ require_once 'config.php';
 // Get short code from URL
 $shortCode = $_GET['code'] ?? '';
 
+// If no code in URL, try to get from direct web app (will be handled by JavaScript)
 if (empty($shortCode)) {
-    header('Location: index.html');
+    // Show a loader page that will handle Telegram start_param
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Loading...</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            .loader {
+                text-align: center;
+                color: white;
+            }
+            .spinner {
+                width: 50px;
+                height: 50px;
+                border: 5px solid rgba(255,255,255,0.3);
+                border-top-color: white;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="loader">
+            <div class="spinner"></div>
+            <p>Loading short link...</p>
+        </div>
+        
+        <script>
+            // Check if opened via direct web app link
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+                
+                const startParam = tg.initDataUnsafe.start_param;
+                
+                if (startParam && startParam.startsWith('s_')) {
+                    // Extract code from start_param (format: s_CODE)
+                    const code = startParam.substring(2);
+                    
+                    // Get user ID if available
+                    let userId = '';
+                    if (tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                        userId = tg.initDataUnsafe.user.id;
+                    }
+                    
+                    // Redirect with proper parameters
+                    const redirectUrl = window.location.origin + '/s.php?code=' + encodeURIComponent(code) + 
+                                      (userId ? '&user_id=' + userId : '');
+                    window.location.href = redirectUrl;
+                } else {
+                    // No valid short code found
+                    setTimeout(() => {
+                        window.location.href = window.location.origin + '/index.html';
+                    }, 1000);
+                }
+            } else {
+                // Not opened in Telegram, redirect to home
+                setTimeout(() => {
+                    window.location.href = window.location.origin + '/index.html';
+                }, 1000);
+            }
+        </script>
+    </body>
+    </html>
+    <?php
     exit;
 }
 
@@ -45,6 +128,29 @@ if ($link['mode'] === 'task_video') {
         <title>Loading Video...</title>
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        
+        <script>
+            // Check if opened via direct web app link (startapp parameter)
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                const startParam = tg.initDataUnsafe.start_param;
+                
+                if (startParam && startParam.startsWith('s_')) {
+                    // Extract code from start_param (format: s_CODE)
+                    const code = startParam.substring(2);
+                    // Redirect to proper URL with code
+                    const currentUrl = new URL(window.location.href);
+                    if (!currentUrl.searchParams.has('code')) {
+                        currentUrl.searchParams.set('code', code);
+                        // Get user ID if available
+                        if (tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                            currentUrl.searchParams.set('user_id', tg.initDataUnsafe.user.id);
+                        }
+                        window.location.href = currentUrl.toString();
+                    }
+                }
+            }
+        </script>
         <style>
             body {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -144,6 +250,29 @@ if ($link['mode'] === 'task_video') {
         <title>Redirecting...</title>
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        
+        <script>
+            // Check if opened via direct web app link (startapp parameter)
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                const startParam = tg.initDataUnsafe.start_param;
+                
+                if (startParam && startParam.startsWith('s_')) {
+                    // Extract code from start_param (format: s_CODE)
+                    const code = startParam.substring(2);
+                    // Redirect to proper URL with code
+                    const currentUrl = new URL(window.location.href);
+                    if (!currentUrl.searchParams.has('code')) {
+                        currentUrl.searchParams.set('code', code);
+                        // Get user ID if available
+                        if (tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                            currentUrl.searchParams.set('user_id', tg.initDataUnsafe.user.id);
+                        }
+                        window.location.href = currentUrl.toString();
+                    }
+                }
+            }
+        </script>
         <style>
             body {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
