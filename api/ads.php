@@ -56,7 +56,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
         
         if (!$adUnit) {
-            jsonResponse(['success' => false, 'error' => 'No active ad unit found'], 404);
+            // Provide detailed error message
+            $debugInfo = [];
+            
+            // Check if placement has any units configured
+            $hasUnits = false;
+            foreach (['primary_ad_unit_id', 'secondary_ad_unit_id', 'tertiary_ad_unit_id'] as $key) {
+                if ($placementConfig[$key]) {
+                    $hasUnits = true;
+                    
+                    // Check why the unit wasn't found
+                    $stmt = $db->prepare("
+                        SELECT au.*, an.name as network_name, an.is_enabled 
+                        FROM ad_units au
+                        JOIN ad_networks an ON au.network_id = an.id
+                        WHERE au.id = ?
+                    ");
+                    $stmt->execute([$placementConfig[$key]]);
+                    $unit = $stmt->fetch();
+                    
+                    if ($unit) {
+                        if (!$unit['is_active']) {
+                            $debugInfo[] = "Ad unit '" . $unit['name'] . "' is inactive (please activate it in admin panel)";
+                        }
+                        if (!$unit['is_enabled']) {
+                            $debugInfo[] = "Ad network '" . $unit['network_name'] . "' is disabled (please enable it in admin panel)";
+                        }
+                    }
+                }
+            }
+            
+            if (!$hasUnits) {
+                error_log("Ads Error: No ad units configured for placement '$placement'");
+                jsonResponse(['success' => false, 'error' => 'No ad units configured for this placement. Please setup ads in admin panel.'], 404);
+            } else {
+                $errorMsg = 'No active ad units found. ' . implode(' ', $debugInfo);
+                error_log("Ads Error: $errorMsg for placement '$placement'");
+                jsonResponse(['success' => false, 'error' => $errorMsg], 404);
+            }
         }
         
         // Log impression if user_id provided

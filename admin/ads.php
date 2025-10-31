@@ -34,9 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $unitCode = sanitizeInput($_POST['unit_code']);
         $unitType = sanitizeInput($_POST['unit_type']);
         $placementKey = sanitizeInput($_POST['placement_key']);
+        $isActive = isset($_POST['is_active']) ? 1 : 0;
         
-        $stmt = $db->prepare("INSERT INTO ad_units (network_id, name, unit_code, unit_type, placement_key) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$networkId, $name, $unitCode, $unitType, $placementKey]);
+        $stmt = $db->prepare("INSERT INTO ad_units (network_id, name, unit_code, unit_type, placement_key, is_active) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$networkId, $name, $unitCode, $unitType, $placementKey, $isActive]);
         $success = "Ad unit added successfully";
     } elseif ($action === 'edit_unit') {
         $id = (int)$_POST['id'];
@@ -194,14 +195,33 @@ $completedToday = $stmt->fetchColumn();
                     <?php foreach ($adPlacements as $placement): ?>
                         <?php
                         $primaryUnitId = $placement['primary_ad_unit_id'];
-                        $status = 'Unknown';
+                        $status = 'Not Configured';
                         $networkName = 'Not Set';
+                        $networkEnabled = false;
                         
                         if ($primaryUnitId) {
                             foreach ($adUnits as $unit) {
                                 if ($unit['id'] == $primaryUnitId) {
                                     $networkName = ucfirst($unit['network_name']);
-                                    $status = $unit['is_active'] ? 'Active' : 'Inactive';
+                                    
+                                    // Check if both unit is active and network is enabled
+                                    $unitActive = $unit['is_active'] == 1;
+                                    
+                                    // Get network enabled status
+                                    foreach ($adNetworks as $network) {
+                                        if ($network['id'] == $unit['network_id']) {
+                                            $networkEnabled = $network['is_enabled'] == 1;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if ($unitActive && $networkEnabled) {
+                                        $status = 'Ready';
+                                    } elseif (!$unitActive) {
+                                        $status = 'Unit Inactive';
+                                    } elseif (!$networkEnabled) {
+                                        $status = 'Network Disabled';
+                                    }
                                     break;
                                 }
                             }
@@ -212,12 +232,14 @@ $completedToday = $stmt->fetchColumn();
                             <td><?php echo htmlspecialchars($networkName); ?></td>
                             <td>
                                 <span class="status-badge" data-status="<?php echo strtolower($status); ?>">
-                                    <?php if ($status === 'Active'): ?>
-                                        <span class="badge bg-success">✓ Working</span>
-                                    <?php elseif ($status === 'Inactive'): ?>
-                                        <span class="badge bg-danger">✗ Inactive</span>
+                                    <?php if ($status === 'Ready'): ?>
+                                        <span class="badge bg-success">Ready</span>
+                                    <?php elseif ($status === 'Unit Inactive'): ?>
+                                        <span class="badge bg-warning">Unit Inactive</span>
+                                    <?php elseif ($status === 'Network Disabled'): ?>
+                                        <span class="badge bg-warning">Network Disabled</span>
                                     <?php else: ?>
-                                        <span class="badge bg-secondary">? Unknown</span>
+                                        <span class="badge bg-danger">Not Configured</span>
                                     <?php endif; ?>
                                 </span>
                             </td>
@@ -478,6 +500,10 @@ $completedToday = $stmt->fetchColumn();
                             </select>
                         </div>
                     </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="add_unit_active" checked>
+                        <label class="form-check-label" for="add_unit_active">Active (Start showing this ad immediately)</label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -673,7 +699,7 @@ async function testAdUnit(unitId, placement) {
     const timeCell = row.querySelector('.last-check-time');
     
     // Show testing status
-    statusBadge.innerHTML = '<span class="badge bg-warning">🔄 Testing...</span>';
+    statusBadge.innerHTML = '<span class="badge bg-warning">?? Testing...</span>';
     
     try {
         const formData = new FormData();
@@ -697,13 +723,13 @@ async function testAdUnit(unitId, placement) {
         const isWorking = Math.random() > 0.2; // 80% success rate
         
         if (isWorking) {
-            statusBadge.innerHTML = '<span class="badge bg-success">✓ Working</span>';
+            statusBadge.innerHTML = '<span class="badge bg-success">? Working</span>';
         } else {
-            statusBadge.innerHTML = '<span class="badge bg-danger">✗ Failed</span>';
+            statusBadge.innerHTML = '<span class="badge bg-danger">? Failed</span>';
         }
     } catch (error) {
         console.error('Test error:', error);
-        statusBadge.innerHTML = '<span class="badge bg-danger">✗ Error</span>';
+        statusBadge.innerHTML = '<span class="badge bg-danger">? Error</span>';
         timeCell.textContent = 'Error';
     }
 }

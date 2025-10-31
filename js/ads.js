@@ -130,11 +130,14 @@ const AdManager = {
             document.body.appendChild(overlay);
         }
         
+        // Clean up error message for display
+        const displayError = error || 'Unable to load advertisement';
+        
         overlay.innerHTML = `
             <div class="ad-loading-content ad-error-content">
                 <div class="ad-error-icon">⚠️</div>
                 <div class="ad-error-text">Ad Failed to Load</div>
-                <div class="ad-loading-subtext">${error || 'Unable to load advertisement'}</div>
+                <div class="ad-loading-subtext" style="white-space: pre-wrap; max-width: 90%; margin: 10px auto;">${displayError}</div>
                 <div class="ad-loading-message">Ad is required to continue this action</div>
                 <button class="ad-retry-btn" onclick="AdManager.retryAd()">
                     🔄 Retry Ad
