@@ -345,11 +345,12 @@ function handleShortLinkAccess($chat_id, $user_id, $username, $first_name, $shor
     }
     
     // Prepare redirect URL with user_id for tracking
+    // IMPORTANT: Add the code as a query parameter so s.php can process it properly
     $redirectUrl = BASE_URL . '/s.php?code=' . urlencode($short_code) . '&user_id=' . $user_id;
     
-    // Send message with web app button
-    $text = "🔗 <b>Redirecting...</b>\n\n";
-    $text .= "📺 Please watch a short ad to continue to your destination\n\n";
+    // Send message with web app button pointing to the shortener page
+    $text = "🔗 <b>Opening Short Link...</b>\n\n";
+    $text .= "📺 Please watch a short ad to continue\n\n";
     $text .= "💰 <i>This helps us keep the bot free and rewarding!</i>\n\n";
     $text .= "👇 <b>Click the button below to continue:</b>";
     
@@ -374,7 +375,9 @@ function handleReferralCallback($chat_id, $user_id) {
     $user = getUserData($user_id);
     
     if ($user) {
-        $referral_link = "https://t.me/" . BOT_USERNAME . "?start=" . $user['referral_code'];
+        $botUsername = str_replace('@', '', BOT_USERNAME);
+        $referral_link = "https://t.me/{$botUsername}?start=" . $user['referral_code'];
+        $shareMessage = "🎁 Join CoinTap Pro & Start Earning!\n\n";
         
         $text = "👥 <b>Invite Friends & Earn!</b>\n\n";
         $text .= "🎁 Your referral link:\n";
@@ -387,7 +390,7 @@ function handleReferralCallback($chat_id, $user_id) {
         $keyboard = [
             'inline_keyboard' => [
                 [
-                    ['text' => '📤 Share Link', 'url' => "https://t.me/share/url?url={$referral_link}&text=Join me and earn coins!"]
+                    ['text' => '📤 Share Link', 'url' => "https://t.me/share/url?url=" . urlencode($referral_link) . "&text=" . urlencode($shareMessage)]
                 ],
                 [
                     ['text' => '🚀 Open App', 'web_app' => ['url' => BASE_URL . '/index.html#referrals']]

@@ -223,15 +223,43 @@ if (isset($update['callback_query'])) {
     }
     
     elseif ($data == 'invite') {
-        $invite_link = "https://t.me/" . str_replace('@', '', BOT_USERNAME) . "?start=" . $telegram_id;
-        $invite_message = "👥 <b>INVITE FRIENDS</b>\n\n";
-        $invite_message .= "🎁 Earn 50 coins for each friend!\n\n";
-        $invite_message .= "📎 Your Referral Link:\n";
-        $invite_message .= "<code>{$invite_link}</code>\n\n";
-        $invite_message .= "Share and start earning! 💰";
-        
-        file_get_contents("https://api.telegram.org/bot" . BOT_TOKEN . "/answerCallbackQuery?callback_query_id={$callback_id}");
-        sendTelegramMessage($chat_id, $invite_message);
+        // Get user's referral code from database
+        try {
+            $conn = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+            $stmt = $conn->prepare("SELECT referral_code FROM users WHERE telegram_id = ?");
+            $stmt->execute([$telegram_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($user && $user['referral_code']) {
+                $botUsername = str_replace('@', '', BOT_USERNAME);
+                $invite_link = "https://t.me/{$botUsername}?start=" . $user['referral_code'];
+                $shareMessage = "🎁 Join CoinTap Pro & Start Earning!\n\n";
+                
+                $invite_message = "👥 <b>INVITE FRIENDS</b>\n\n";
+                $invite_message .= "🎁 Earn coins for each friend!\n\n";
+                $invite_message .= "📎 Your Referral Link:\n";
+                $invite_message .= "<code>{$invite_link}</code>\n\n";
+                $invite_message .= "Share and start earning! 💰";
+                
+                $reply_markup = [
+                    'inline_keyboard' => [
+                        [
+                            [
+                                'text' => '📤 Share Link',
+                                'url' => "https://t.me/share/url?url=" . urlencode($invite_link) . "&text=" . urlencode($shareMessage)
+                            ]
+                        ]
+                    ]
+                ];
+                
+                file_get_contents("https://api.telegram.org/bot" . BOT_TOKEN . "/answerCallbackQuery?callback_query_id={$callback_id}");
+                sendTelegramMessage($chat_id, $invite_message, $reply_markup);
+            } else {
+                file_get_contents("https://api.telegram.org/bot" . BOT_TOKEN . "/answerCallbackQuery?callback_query_id={$callback_id}&text=Error loading referral code");
+            }
+        } catch (PDOException $e) {
+            file_get_contents("https://api.telegram.org/bot" . BOT_TOKEN . "/answerCallbackQuery?callback_query_id={$callback_id}&text=Error");
+        }
     }
     
     elseif ($data == 'help') {
@@ -295,9 +323,10 @@ function handleShortLinkStart($chat_id, $telegram_id, $username, $user_first_nam
         }
         
         // Prepare redirect URL with user_id for tracking
+        // IMPORTANT: Add the code as a query parameter so s.php can process it properly
         $redirectUrl = BASE_URL . '/s.php?code=' . urlencode($short_code) . '&user_id=' . $telegram_id;
         
-        // Send message with web app button
+        // Send message with web app button pointing to the shortener page
         $text = "🔗 <b>Opening Short Link...</b>\n\n";
         $text .= "📺 Please watch a short ad to continue\n\n";
         $text .= "💰 <i>This helps us keep the bot free and rewarding!</i>\n\n";
