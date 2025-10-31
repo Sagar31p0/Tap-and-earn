@@ -7,8 +7,8 @@ define('DB_PASS', 'your_password_here'); // Update with actual password
 
 // Bot Configuration
 define('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE'); // Update with actual bot token
-define('BOT_USERNAME', '@kuchpvildybot');
-define('BASE_URL', 'https://reqa.antipiracyforce.org/test');
+define('BOT_USERNAME', '@CoinTapProBot');
+define('BASE_URL', 'https://go.teraboxurll.in');
 
 // Session Configuration
 ini_set('session.cookie_httponly', 1);

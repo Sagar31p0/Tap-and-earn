@@ -9,8 +9,8 @@ let currentScreen = 'home';
 let tapCount = 0;
 let tapTimer = null;
 
-// API Base URL
-const API_URL = 'https://reqa.antipiracyforce.org/test/api';
+// API Base URL - Use relative path for flexibility
+const API_URL = window.location.origin + '/api';
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', async () => {

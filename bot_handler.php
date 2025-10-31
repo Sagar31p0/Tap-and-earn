@@ -70,6 +70,14 @@ if (isset($update['message'])) {
     // Handle /start command
     if ($text == '/start' || strpos($text, '/start') === 0) {
         
+        // Check for short link parameter (format: /start s_CODE)
+        if (preg_match('/\/start\s+s_([a-zA-Z0-9]+)/', $text, $matches)) {
+            $short_code = $matches[1];
+            handleShortLinkStart($chat_id, $telegram_id, $username, $user_first_name, $short_code);
+            http_response_code(200);
+            exit;
+        }
+        
         // Register user in database if not exists
         try {
             $conn = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
@@ -117,7 +125,7 @@ if (isset($update['message'])) {
                 [
                     [
                         'text' => '🚀 Launch App',
-                        'web_app' => ['url' => 'https://reqa.antipiracyforce.org/test/']
+                        'web_app' => ['url' => BASE_URL . '/index.html']
                     ]
                 ],
                 [
@@ -215,7 +223,7 @@ if (isset($update['callback_query'])) {
     }
     
     elseif ($data == 'invite') {
-        $invite_link = "https://t.me/pvidlyopbot?start=" . $telegram_id;
+        $invite_link = "https://t.me/" . str_replace('@', '', BOT_USERNAME) . "?start=" . $telegram_id;
         $invite_message = "👥 <b>INVITE FRIENDS</b>\n\n";
         $invite_message .= "🎁 Earn 50 coins for each friend!\n\n";
         $invite_message .= "📎 Your Referral Link:\n";
@@ -237,6 +245,99 @@ if (isset($update['callback_query'])) {
         
         file_get_contents("https://api.telegram.org/bot" . BOT_TOKEN . "/answerCallbackQuery?callback_query_id={$callback_id}");
         sendTelegramMessage($chat_id, $help_message);
+    }
+}
+
+/**
+ * Handle short link access via bot
+ */
+function handleShortLinkStart($chat_id, $telegram_id, $username, $user_first_name, $short_code) {
+    // Register user if not exists
+    try {
+        $conn = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        
+        // Check if user exists
+        $stmt = $conn->prepare("SELECT id FROM users WHERE telegram_id = ?");
+        $stmt->execute([$telegram_id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            // Insert new user
+            $stmt = $conn->prepare("INSERT INTO users (telegram_id, username, first_name, balance, created_at) VALUES (?, ?, ?, 100, NOW())");
+            $stmt->execute([$telegram_id, $username, $user_first_name]);
+        }
+        
+        // Get short link details from database
+        $stmt = $conn->prepare("SELECT * FROM short_links WHERE short_code = ?");
+        $stmt->execute([$short_code]);
+        $link = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$link) {
+            // Link not found - send regular welcome message
+            $text = "❌ <b>Link Not Found</b>\n\n";
+            $text .= "This short link doesn't exist or has been deleted.\n\n";
+            $text .= "👇 Start earning with our bot instead!";
+            
+            $reply_markup = [
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => '🚀 Launch App',
+                            'web_app' => ['url' => BASE_URL . '/index.html']
+                        ]
+                    ]
+                ]
+            ];
+            
+            sendTelegramMessage($chat_id, $text, $reply_markup);
+            return;
+        }
+        
+        // Prepare redirect URL with user_id for tracking
+        $redirectUrl = BASE_URL . '/s.php?code=' . urlencode($short_code) . '&user_id=' . $telegram_id;
+        
+        // Send message with web app button
+        $text = "🔗 <b>Opening Short Link...</b>\n\n";
+        $text .= "📺 Please watch a short ad to continue\n\n";
+        $text .= "💰 <i>This helps us keep the bot free and rewarding!</i>\n\n";
+        $text .= "👇 <b>Click the button below to continue:</b>";
+        
+        $reply_markup = [
+            'inline_keyboard' => [
+                [
+                    [
+                        'text' => '▶️ Watch Ad & Continue',
+                        'web_app' => ['url' => $redirectUrl]
+                    ]
+                ],
+                [
+                    [
+                        'text' => '🏠 Back to Main App',
+                        'web_app' => ['url' => BASE_URL . '/index.html']
+                    ]
+                ]
+            ]
+        ];
+        
+        sendTelegramMessage($chat_id, $text, $reply_markup);
+        
+    } catch (PDOException $e) {
+        error_log("Short link handler error: " . $e->getMessage());
+        
+        // Send error message
+        $text = "❌ <b>Error</b>\n\nSomething went wrong. Please try again later.";
+        $reply_markup = [
+            'inline_keyboard' => [
+                [
+                    [
+                        'text' => '🚀 Launch App',
+                        'web_app' => ['url' => BASE_URL . '/index.html']
+                    ]
+                ]
+            ]
+        ];
+        sendTelegramMessage($chat_id, $text, $reply_markup);
     }
 }
 
