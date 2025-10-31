@@ -11,7 +11,7 @@
     <script type="text/javascript" src="https://cdn.tgads.space/assets/js/adexium-widget.min.js"></script>
     
     <!-- Monetag -->
-    <script src="//libtl.com/sdk.js" data-zone="10055887" data-sdk="show_10055887"></script>
+    <script src="//libtl.com/sdk.js" data-zone="10113890" data-sdk="show_10113890"></script>
     
     <!-- Adsgram -->
     <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
@@ -260,5 +260,25 @@
 
     <script src="js/app.js"></script>
     <script src="js/ads.js"></script>
+    
+    <!-- Adexium Auto-initialization -->
+    <script type="text/javascript">
+        // Initialize Adexium interstitial in auto mode
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof AdexiumWidget !== 'undefined') {
+                try {
+                    const adexiumWidget = new AdexiumWidget({
+                        wid: '8391da33-7acd-47a9-8d83-f7b4bf4956b1',
+                        adFormat: 'interstitial'
+                    });
+                    // Auto mode will manage showing ads automatically
+                    adexiumWidget.autoMode();
+                    console.log('✅ Adexium auto-mode initialized');
+                } catch (error) {
+                    console.error('❌ Adexium auto-init error:', error);
+                }
+            }
+        });
+    </script>
 </body>
 </html>
