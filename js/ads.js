@@ -51,7 +51,7 @@ const AdManager = {
             }
             
             // Check Monetag SDK
-            if (typeof show_10055887 === 'function') {
+            if (typeof show_10113890 === 'function') {
                 console.log('✅ Monetag SDK available');
             } else {
                 console.warn('⚠️ Monetag SDK not available');
@@ -74,7 +74,7 @@ const AdManager = {
             const checkSDKs = () => {
                 const adsgramReady = !!window.Adsgram;
                 const adexiumReady = !!window.AdexiumWidget;
-                const monetagReady = typeof show_10055887 === 'function';
+                const monetagReady = typeof show_10113890 === 'function';
                 const richadsReady = !!window.TelegramAdsController;
                 
                 if (adsgramReady && adexiumReady && monetagReady && richadsReady) {
@@ -242,30 +242,60 @@ const AdManager = {
             try {
                 console.log('🎬 Attempting to show Monetag ad:', adUnit);
                 
-                if (typeof show_10055887 === 'function') {
+                if (typeof show_10113890 === 'function') {
                     let adCompleted = false;
                     
-                    show_10055887({
-                        type: adUnit.type || 'inApp',
-                        inAppSettings: {
-                            frequency: 1,
-                            capping: 0,
-                            interval: 0,
-                            timeout: 0,
-                            everyPage: false
-                        }
-                    }).then(() => {
-                        console.log('✅ Monetag ad completed');
-                        adCompleted = true;
-                        resolve();
-                    }).catch((error) => {
-                        console.error('❌ Monetag error:', error);
-                        if (!adCompleted) {
-                            reject(new Error('Monetag ad failed: ' + error));
-                        }
-                    });
+                    // Determine the ad type based on unit configuration
+                    const adType = adUnit.type || 'inApp';
                     
-                    console.log('📺 Monetag ad show() called');
+                    if (adType === 'rewarded') {
+                        // Rewarded ad format
+                        show_10113890().then(() => {
+                            console.log('✅ Monetag rewarded ad completed');
+                            adCompleted = true;
+                            resolve();
+                        }).catch((error) => {
+                            console.error('❌ Monetag rewarded error:', error);
+                            if (!adCompleted) {
+                                reject(new Error('Monetag rewarded ad failed: ' + error));
+                            }
+                        });
+                    } else if (adType === 'interstitial' || adType === 'inApp') {
+                        // In-App Interstitial format
+                        show_10113890({
+                            type: 'inApp',
+                            inAppSettings: {
+                                frequency: 1,
+                                capping: 0,
+                                interval: 0,
+                                timeout: 0,
+                                everyPage: false
+                            }
+                        }).then(() => {
+                            console.log('✅ Monetag interstitial ad completed');
+                            adCompleted = true;
+                            resolve();
+                        }).catch((error) => {
+                            console.error('❌ Monetag interstitial error:', error);
+                            if (!adCompleted) {
+                                reject(new Error('Monetag interstitial ad failed: ' + error));
+                            }
+                        });
+                    } else {
+                        // Default to rewarded popup
+                        show_10113890('pop').then(() => {
+                            console.log('✅ Monetag popup ad completed');
+                            adCompleted = true;
+                            resolve();
+                        }).catch((error) => {
+                            console.error('❌ Monetag popup error:', error);
+                            if (!adCompleted) {
+                                reject(new Error('Monetag popup ad failed: ' + error));
+                            }
+                        });
+                    }
+                    
+                    console.log('📺 Monetag ad show() called with type:', adType);
                     
                     // Timeout after 30 seconds
                     setTimeout(() => {
