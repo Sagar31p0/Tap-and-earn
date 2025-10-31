@@ -133,6 +133,7 @@ const tapCoin = document.getElementById('tap-coin');
 const tapCounter = document.getElementById('tap-counter');
 
 let isTappingBlocked = false;
+let tapRewardPerTap = 5; // Will be updated from server
 
 tapCoin.addEventListener('click', async (e) => {
     if (isTappingBlocked) {
@@ -152,15 +153,15 @@ tapCoin.addEventListener('click', async (e) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    createFloatingText('+5', x, y);
+    createFloatingText(`+${tapRewardPerTap}`, x, y);
     
     // Vibrate
     if (tg.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
     
-    // Update local state
-    userData.coins += 5;
+    // Update local state optimistically
+    userData.coins += tapRewardPerTap;
     userData.energy -= 1;
     updateBalance();
     updateEnergy();
@@ -186,25 +187,42 @@ async function sendTaps(taps) {
         
         const data = await response.json();
         if (data.success) {
+            // Update tap reward from server response
+            if (data.tap_reward) {
+                tapRewardPerTap = parseFloat(data.tap_reward);
+            }
+            
+            // Sync with server values to prevent drift
             userData.coins = data.total_coins;
             userData.energy = data.energy;
             updateBalance();
             updateEnergy();
             
             // Check if ad should be shown (forced)
-            if (data.show_ad) {
+            if (data.show_ad && !isTappingBlocked) {
                 // Block tapping until ad is watched
                 isTappingBlocked = true;
                 tapCoin.style.opacity = '0.5';
                 tapCoin.style.cursor = 'not-allowed';
                 
-                await showAd('tap', () => {
-                    // Unblock tapping after ad completion
+                showNotification('⏳ Please watch the ad to continue tapping', 'warning');
+                
+                // Show ad with proper error handling
+                try {
+                    await showAd('tap', () => {
+                        // Unblock tapping after ad completion
+                        isTappingBlocked = false;
+                        tapCoin.style.opacity = '1';
+                        tapCoin.style.cursor = 'pointer';
+                        showNotification('✅ Ad completed! Keep tapping!', 'success');
+                    });
+                } catch (adError) {
+                    console.error('Tap ad error:', adError);
+                    // Unblock even if ad fails
                     isTappingBlocked = false;
                     tapCoin.style.opacity = '1';
                     tapCoin.style.cursor = 'pointer';
-                    showNotification('Ad completed! Keep tapping!', 'success');
-                });
+                }
             }
         }
     } catch (error) {

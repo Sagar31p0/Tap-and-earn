@@ -97,7 +97,8 @@ try {
         'coins_earned' => $coinsEarned,
         'total_coins' => (float)$updatedUser['coins'],
         'energy' => (int)$updatedUser['energy'],
-        'show_ad' => $shouldShowAd
+        'show_ad' => $shouldShowAd,
+        'tap_reward' => $tapReward
     ]);
     
 } catch (Exception $e) {
