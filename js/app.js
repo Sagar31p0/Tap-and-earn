@@ -32,6 +32,17 @@ async function initializeApp() {
         return;
     }
     
+    // Check for short link in start_param (format: s_CODE)
+    const startParam = initData.start_param;
+    if (startParam && startParam.startsWith('s_')) {
+        // Extract short code and redirect to shortener page
+        const shortCode = startParam.substring(2);
+        const redirectUrl = `${window.location.origin}/s.php?code=${encodeURIComponent(shortCode)}&user_id=${user.id}`;
+        console.log('🔗 Short link detected, redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
+        return; // Stop initialization
+    }
+    
     // Check for referral code
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
