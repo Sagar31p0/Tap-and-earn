@@ -47,6 +47,21 @@ INSERT INTO `admin_users` (`id`, `username`, `password`, `email`, `role`, `is_ac
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `admin_logs`
+--
+
+CREATE TABLE `admin_logs` (
+  `id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `details` text DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `ad_logs`
 --
 
@@ -549,6 +564,15 @@ ALTER TABLE `admin_users`
   ADD UNIQUE KEY `username` (`username`);
 
 --
+-- Indexes for table `admin_logs`
+--
+ALTER TABLE `admin_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `admin_id` (`admin_id`),
+  ADD KEY `idx_action` (`action`),
+  ADD KEY `idx_created_at` (`created_at`);
+
+--
 -- Indexes for table `ad_logs`
 --
 ALTER TABLE `ad_logs`
@@ -705,6 +729,12 @@ ALTER TABLE `admin_users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `admin_logs`
+--
+ALTER TABLE `admin_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `ad_logs`
 --
 ALTER TABLE `ad_logs`
@@ -821,6 +851,12 @@ ALTER TABLE `withdrawals`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `admin_logs`
+--
+ALTER TABLE `admin_logs`
+  ADD CONSTRAINT `admin_logs_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `ad_logs`

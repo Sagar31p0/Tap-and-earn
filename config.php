@@ -193,4 +193,52 @@ function updateUserEnergy($userId) {
     
     return 100;
 }
+
+function clearAllCache($clearSessions = false) {
+    $cleared = [];
+    
+    // Clear PHP OpCache
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+        $cleared[] = 'OpCache';
+    }
+    
+    // Clear APCu cache if available
+    if (function_exists('apcu_clear_cache')) {
+        apcu_clear_cache();
+        $cleared[] = 'APCu Cache';
+    }
+    
+    // Clear realpath cache
+    clearstatcache(true);
+    $cleared[] = 'Stat Cache';
+    
+    // Clear session cache if requested
+    if ($clearSessions) {
+        $sessionPath = session_save_path();
+        if (empty($sessionPath)) {
+            $sessionPath = sys_get_temp_dir();
+        }
+        
+        $currentSessionId = session_id();
+        $sessionsCleared = 0;
+        
+        if (is_dir($sessionPath)) {
+            $sessionFiles = glob($sessionPath . '/sess_*');
+            foreach ($sessionFiles as $file) {
+                $sessionId = str_replace($sessionPath . '/sess_', '', $file);
+                if ($sessionId !== $currentSessionId && is_file($file)) {
+                    @unlink($file);
+                    $sessionsCleared++;
+                }
+            }
+        }
+        
+        if ($sessionsCleared > 0) {
+            $cleared[] = "Sessions ($sessionsCleared files)";
+        }
+    }
+    
+    return $cleared;
+}
 ?>

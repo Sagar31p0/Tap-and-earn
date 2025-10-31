@@ -224,6 +224,38 @@ while ($row = $stmt->fetch()) {
     </div>
 </form>
 
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="stat-card">
+            <h5 class="mb-3"><i class="fas fa-broom"></i> Cache Management</h5>
+            <p class="text-muted">Clear all cached data including OpCache, sessions, and temporary files to improve performance and apply changes immediately.</p>
+            
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="clearSessions">
+                    <label class="form-check-label" for="clearSessions">
+                        Also clear user sessions (will log out all users except you)
+                    </label>
+                </div>
+            </div>
+            
+            <div class="d-flex gap-2 align-items-center">
+                <button type="button" class="btn btn-warning" id="clearCacheBtn">
+                    <i class="fas fa-broom"></i> Force Clear Cache
+                </button>
+                <div id="cacheStatus" class="ms-3"></div>
+            </div>
+            
+            <div id="cacheResults" class="mt-3" style="display: none;">
+                <div class="alert alert-info">
+                    <strong>Cache Cleared:</strong>
+                    <ul id="cacheList" class="mb-0 mt-2"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Add form validation and loading state
 document.querySelector('form').addEventListener('submit', function(e) {
@@ -239,6 +271,61 @@ window.addEventListener('DOMContentLoaded', function() {
         saveBtn.disabled = false;
         saveBtn.innerHTML = '<i class="fas fa-save"></i> Save All Settings';
     }
+});
+
+// Cache clearing functionality
+document.getElementById('clearCacheBtn').addEventListener('click', function() {
+    const btn = this;
+    const statusDiv = document.getElementById('cacheStatus');
+    const resultsDiv = document.getElementById('cacheResults');
+    const cacheList = document.getElementById('cacheList');
+    const clearSessions = document.getElementById('clearSessions').checked;
+    
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing Cache...';
+    statusDiv.innerHTML = '<span class="text-info"><i class="fas fa-spinner fa-spin"></i> Processing...</span>';
+    resultsDiv.style.display = 'none';
+    
+    // Send AJAX request
+    fetch('cache.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'clear_sessions=' + clearSessions
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-broom"></i> Force Clear Cache';
+        
+        if (data.success) {
+            statusDiv.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> ' + data.message + '</span>';
+            
+            // Show what was cleared
+            cacheList.innerHTML = '';
+            data.cleared.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                cacheList.appendChild(li);
+            });
+            resultsDiv.style.display = 'block';
+            
+            // Hide status after 3 seconds
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 5000);
+        } else {
+            statusDiv.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> ' + data.message + '</span>';
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-broom"></i> Force Clear Cache';
+        statusDiv.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Error: ' + error.message + '</span>';
+        console.error('Cache clear error:', error);
+    });
 });
 </script>
 
