@@ -43,6 +43,7 @@ if ($link['mode'] === 'task_video') {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Loading Video...</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
             body {
@@ -97,6 +98,13 @@ if ($link['mode'] === 'task_video') {
         </div>
         
         <script>
+            // Initialize Telegram WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand(); // Expand to full height
+            }
+            
             let countdown = 5;
             const originalUrl = <?php echo json_encode($link['original_url']); ?>;
             const linkId = <?php echo $link['id']; ?>;
@@ -134,6 +142,7 @@ if ($link['mode'] === 'task_video') {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>Redirecting...</title>
+        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
             body {
@@ -268,6 +277,16 @@ if ($link['mode'] === 'task_video') {
         </div>
         
         <script>
+            // Initialize Telegram WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand(); // Expand to full height
+                
+                // Set theme colors
+                document.body.style.background = tg.backgroundColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }
+            
             const originalUrl = <?php echo json_encode($link['original_url']); ?>;
             const linkId = <?php echo $link['id']; ?>;
             const userId = <?php echo json_encode($userId); ?>;

@@ -84,6 +84,13 @@ if ($callback_query) {
  * Handle /start command
  */
 function handleStartCommand($chat_id, $user_id, $username, $first_name, $text) {
+    // Check for short link parameter (format: s_CODE)
+    if (preg_match('/\/start\s+s_([a-zA-Z0-9]+)/', $text, $matches)) {
+        $short_code = $matches[1];
+        handleShortLinkAccess($chat_id, $user_id, $username, $first_name, $short_code);
+        return;
+    }
+    
     // Check for referral code
     $referral_code = null;
     if (preg_match('/\/start\s+(.+)/', $text, $matches)) {
@@ -304,6 +311,60 @@ function handleCallbackQuery($chat_id, $user_id, $callback_data, $callback_query
         default:
             answerCallbackQuery($callback_query_id);
     }
+}
+
+/**
+ * Handle short link access via bot
+ */
+function handleShortLinkAccess($chat_id, $user_id, $username, $first_name, $short_code) {
+    // Register user if not exists
+    registerUser($user_id, $username, $first_name, null);
+    
+    // Get short link details from database
+    $db = Database::getInstance()->getConnection();
+    $stmt = $db->prepare("SELECT * FROM short_links WHERE short_code = ?");
+    $stmt->execute([$short_code]);
+    $link = $stmt->fetch();
+    
+    if (!$link) {
+        // Link not found
+        $text = "❌ <b>Link Not Found</b>\n\n";
+        $text .= "This short link doesn't exist or has been deleted.\n\n";
+        $text .= "👇 Start earning with our bot instead!";
+        
+        $keyboard = [
+            'inline_keyboard' => [
+                [
+                    ['text' => '🚀 Open Earn Bot App', 'web_app' => ['url' => BASE_URL . '/index.html']]
+                ]
+            ]
+        ];
+        
+        sendMessage($chat_id, $text, $keyboard);
+        return;
+    }
+    
+    // Prepare redirect URL with user_id for tracking
+    $redirectUrl = BASE_URL . '/s.php?code=' . urlencode($short_code) . '&user_id=' . $user_id;
+    
+    // Send message with web app button
+    $text = "🔗 <b>Redirecting...</b>\n\n";
+    $text .= "📺 Please watch a short ad to continue to your destination\n\n";
+    $text .= "💰 <i>This helps us keep the bot free and rewarding!</i>\n\n";
+    $text .= "👇 <b>Click the button below to continue:</b>";
+    
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '▶️ Watch Ad & Continue', 'web_app' => ['url' => $redirectUrl]]
+            ],
+            [
+                ['text' => '🏠 Back to Main App', 'web_app' => ['url' => BASE_URL . '/index.html']]
+            ]
+        ]
+    ];
+    
+    sendMessage($chat_id, $text, $keyboard);
 }
 
 /**
