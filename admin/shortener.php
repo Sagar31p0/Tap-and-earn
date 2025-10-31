@@ -174,8 +174,8 @@ $conversionRate = $totalClicks > 0 ? round(($totalConversions / $totalClicks) * 
                 <?php foreach ($shortLinks as $link): ?>
                 <?php 
                 $rate = $link['clicks'] > 0 ? round(($link['conversions'] / $link['clicks']) * 100, 1) : 0;
-                // Generate Telegram bot URL instead of web URL
-                $shortUrl = 'https://t.me/' . str_replace('@', '', BOT_USERNAME) . '?start=s_' . $link['short_code'];
+                // Generate Direct Web App URL - Opens directly without bot start
+                $shortUrl = 'https://t.me/' . str_replace('@', '', BOT_USERNAME) . '/Tap?startapp=s_' . $link['short_code'];
                 ?>
                 <tr>
                     <td><?php echo $link['id']; ?></td>
@@ -287,7 +287,7 @@ $conversionRate = $totalClicks > 0 ? round(($totalConversions / $totalClicks) * 
                     </div>
                     
                     <div class="alert alert-info">
-                        <strong>Preview Bot URL:</strong> <span id="add_preview">https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>?start=s_[code]</span>
+                        <strong>Preview Direct Link:</strong> <span id="add_preview">https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>/Tap?startapp=s_[code]</span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -371,7 +371,7 @@ $conversionRate = $totalClicks > 0 ? round(($totalConversions / $totalClicks) * 
 <script>
 // Update preview when short code changes
 document.getElementById('add_short_code').addEventListener('input', function() {
-    document.getElementById('add_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>?start=s_' + this.value;
+    document.getElementById('add_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>/Tap?startapp=s_' + this.value;
 });
 
 function generateCode(fieldId) {
@@ -385,9 +385,9 @@ function generateCode(fieldId) {
     
     // Update preview if it's the add form
     if (fieldId === 'add_short_code') {
-        document.getElementById('add_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>?start=s_' + code;
+        document.getElementById('add_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>/Tap?startapp=s_' + code;
     } else {
-        document.getElementById('edit_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>?start=s_' + code;
+        document.getElementById('edit_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>/Tap?startapp=s_' + code;
     }
 }
 
@@ -412,7 +412,7 @@ function editLink(link) {
     document.getElementById('edit_mode').value = link.mode;
     document.getElementById('edit_task').value = link.task_id || '';
     document.getElementById('edit_ad').value = link.ad_unit_id || '';
-    document.getElementById('edit_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>?start=s_' + link.short_code;
+    document.getElementById('edit_preview').textContent = 'https://t.me/<?php echo str_replace('@', '', BOT_USERNAME); ?>/Tap?startapp=s_' + link.short_code;
     
     toggleModeFields('edit');
     new bootstrap.Modal(document.getElementById('editLinkModal')).show();
