@@ -1,11 +1,18 @@
 <?php
 require_once 'config.php';
 
-// Get short code from URL
-$shortCode = $_GET['code'] ?? '';
+// Set proper headers to prevent caching issues
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
-// If no code in URL, try to get from direct web app (will be handled by JavaScript)
-if (empty($shortCode)) {
+// Error handling wrapper
+try {
+    // Get short code from URL
+    $shortCode = $_GET['code'] ?? '';
+
+    // If no code in URL, try to get from direct web app (will be handled by JavaScript)
+    if (empty($shortCode)) {
     // Show a loader page that will handle Telegram start_param
     ?>
     <!DOCTYPE html>
@@ -92,28 +99,51 @@ if (empty($shortCode)) {
     exit;
 }
 
+// Validate database connection
 $db = Database::getInstance()->getConnection();
+if (!$db) {
+    error_log("s.php: Database connection failed for code: " . $shortCode);
+    http_response_code(500);
+    echo "<!DOCTYPE html><html><body><h1>Service Unavailable</h1><p>Please try again later.</p></body></html>";
+    exit;
+}
 
 // Get short link details
-$stmt = $db->prepare("SELECT * FROM short_links WHERE short_code = ?");
-$stmt->execute([$shortCode]);
-$link = $stmt->fetch();
+try {
+    $stmt = $db->prepare("SELECT * FROM short_links WHERE short_code = ?");
+    $stmt->execute([$shortCode]);
+    $link = $stmt->fetch();
+} catch (Exception $e) {
+    error_log("s.php: Database query error: " . $e->getMessage() . " for code: " . $shortCode);
+    http_response_code(500);
+    echo "<!DOCTYPE html><html><body><h1>Error</h1><p>Unable to process request.</p></body></html>";
+    exit;
+}
 
 if (!$link) {
-    header('Location: index.html');
+    error_log("s.php: Short code not found: " . $shortCode);
+    header('Location: /index.html');
     exit;
 }
 
 // Increment click counter
-$stmt = $db->prepare("UPDATE short_links SET clicks = clicks + 1 WHERE id = ?");
-$stmt->execute([$link['id']]);
+try {
+    $stmt = $db->prepare("UPDATE short_links SET clicks = clicks + 1 WHERE id = ?");
+    $stmt->execute([$link['id']]);
+} catch (Exception $e) {
+    error_log("s.php: Failed to increment click counter: " . $e->getMessage());
+}
 
 // Get user ID from session or Telegram WebApp data if available
 $userId = $_GET['user_id'] ?? null;
 
 // Log the click if user is identified
 if ($userId) {
-    logAdEvent($userId, 'shortlink', $link['ad_unit_id'], 'click');
+    try {
+        logAdEvent($userId, 'shortlink', $link['ad_unit_id'], 'click');
+    } catch (Exception $e) {
+        error_log("s.php: Failed to log ad event: " . $e->getMessage());
+    }
 }
 
 // Redirect based on mode
@@ -546,5 +576,65 @@ if ($link['mode'] === 'task_video') {
     </body>
     </html>
     <?php
+}
+
+} catch (Exception $e) {
+    // Catch any unhandled exceptions
+    error_log("s.php: Unhandled exception: " . $e->getMessage());
+    http_response_code(500);
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Error</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+            .error-box {
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                text-align: center;
+                max-width: 400px;
+            }
+            h1 {
+                color: #e74c3c;
+                margin-bottom: 20px;
+            }
+            p {
+                color: #555;
+                margin-bottom: 20px;
+            }
+            a {
+                display: inline-block;
+                padding: 10px 20px;
+                background: #667eea;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="error-box">
+            <h1>?? Oops!</h1>
+            <p>Something went wrong while processing your request.</p>
+            <p>Please try again or contact support if the problem persists.</p>
+            <a href="/index.html">Go to Home</a>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
 }
 ?>

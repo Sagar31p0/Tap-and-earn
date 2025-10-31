@@ -5,6 +5,11 @@ define('DB_NAME', 'u988479389_tery');
 define('DB_USER', 'u988479389_tery');
 define('DB_PASS', 'your_password_here'); // Update with actual password
 
+// Check if database credentials are set
+if (DB_PASS === 'your_password_here') {
+    error_log("WARNING: Database password not configured in config.php");
+}
+
 // Bot Configuration
 define('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE'); // Update with actual bot token
 define('BOT_USERNAME', '@CoinTapProBot');
@@ -61,6 +66,12 @@ class Database {
             );
         } catch(PDOException $e) {
             error_log("Database Connection Error: " . $e->getMessage());
+            // For web pages (not API), show user-friendly error
+            if (!isset($_SERVER['HTTP_ACCEPT']) || strpos($_SERVER['HTTP_ACCEPT'], 'application/json') === false) {
+                http_response_code(500);
+                echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Database Error</title></head><body style="font-family:Arial;padding:50px;text-align:center;"><h1>Service Unavailable</h1><p>Unable to connect to the database. Please try again later.</p></body></html>';
+                exit;
+            }
             die(json_encode(['success' => false, 'error' => 'Database connection failed']));
         }
     }
