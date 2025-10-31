@@ -5,12 +5,34 @@ require_once 'header.php';
 $db = Database::getInstance()->getConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    foreach ($_POST as $key => $value) {
-        if ($key !== 'submit') {
-            updateSetting($key, $value);
+    try {
+        $db->beginTransaction();
+        
+        foreach ($_POST as $key => $value) {
+            if ($key !== 'submit') {
+                // Ensure numeric values are properly formatted
+                if (is_numeric($value)) {
+                    $value = $value + 0; // Convert to proper numeric type
+                }
+                updateSetting($key, $value);
+            }
         }
+        
+        $db->commit();
+        $success = "Settings updated successfully!";
+        
+        // Clear any opcode cache
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+        
+    } catch (Exception $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+        $error = "Failed to update settings: " . $e->getMessage();
+        error_log("Settings update error: " . $e->getMessage());
     }
-    $success = "Settings updated successfully!";
 }
 
 // Get all settings
@@ -27,7 +49,14 @@ while ($row = $stmt->fetch()) {
 
 <?php if (isset($success)): ?>
     <div class="alert alert-success alert-dismissible fade show">
-        <?php echo $success; ?>
+        <i class="fas fa-check-circle"></i> <?php echo $success; ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
+<?php if (isset($error)): ?>
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-triangle"></i> <?php echo $error; ?>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
@@ -189,10 +218,28 @@ while ($row = $stmt->fetch()) {
     </div>
     
     <div class="text-center">
-        <button type="submit" name="submit" class="btn btn-gradient btn-lg px-5">
+        <button type="submit" name="submit" class="btn btn-gradient btn-lg px-5" id="saveBtn">
             <i class="fas fa-save"></i> Save All Settings
         </button>
     </div>
 </form>
+
+<script>
+// Add form validation and loading state
+document.querySelector('form').addEventListener('submit', function(e) {
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+});
+
+// Show success message and re-enable button after page load
+window.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save All Settings';
+    }
+});
+</script>
 
 <?php require_once 'footer.php'; ?>

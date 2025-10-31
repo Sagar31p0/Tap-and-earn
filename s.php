@@ -132,7 +132,7 @@ if ($link['mode'] === 'task_video') {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>Redirecting...</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
@@ -142,12 +142,16 @@ if ($link['mode'] === 'task_video') {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                margin: 0;
+                padding: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
             .redirect-container {
                 background: white;
                 border-radius: 20px;
                 padding: 40px;
                 max-width: 600px;
+                width: 100%;
                 text-align: center;
                 box-shadow: 0 10px 40px rgba(0,0,0,0.3);
             }
@@ -164,45 +168,232 @@ if ($link['mode'] === 'task_video') {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
+            .ad-message {
+                background: #fff3cd;
+                border: 1px solid #ffc107;
+                border-radius: 10px;
+                padding: 15px;
+                margin: 20px 0;
+                color: #856404;
+            }
+            #skipBtn {
+                display: none;
+                margin-top: 20px;
+            }
+            .ad-loading-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 9999;
+                align-items: center;
+                justify-content: center;
+            }
+            .ad-loading-overlay.show {
+                display: flex;
+            }
+            .ad-loading-content {
+                background: white;
+                border-radius: 20px;
+                padding: 40px;
+                text-align: center;
+                max-width: 400px;
+                width: 90%;
+            }
+            .ad-loading-spinner {
+                width: 60px;
+                height: 60px;
+                border: 6px solid #f3f3f3;
+                border-top: 6px solid #667eea;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            }
+            .ad-loading-text {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .ad-loading-subtext {
+                color: #666;
+                margin-bottom: 10px;
+            }
+            .ad-error-content {
+                background: #fff3cd;
+            }
+            .ad-error-icon {
+                font-size: 48px;
+                margin-bottom: 15px;
+            }
+            .ad-error-text {
+                font-size: 20px;
+                font-weight: bold;
+                color: #856404;
+                margin-bottom: 10px;
+            }
+            .ad-retry-btn {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 10px;
+                font-size: 16px;
+                cursor: pointer;
+                margin-top: 15px;
+            }
         </style>
+        
+        <!-- Load Ad SDKs -->
+        <script src="https://cdn.jsdelivr.net/gh/Bxstvn/AdexiumMiniAppAdsSDK@latest/AdexiumWidgets.js"></script>
+        <script src="https://tb.tgadsnetwork.com/sdk.js"></script>
+        <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+        <script async src="https://cdn.adexium.io/tags/10113890/inpage.min.js"></script>
     </head>
     <body>
         <div class="redirect-container">
-            <h3>Please wait...</h3>
+            <h3>?? Redirecting...</h3>
             <div class="spinner"></div>
-            <p class="text-muted">Redirecting you in <span id="countdown">3</span> seconds...</p>
-            <div id="adSpace" style="min-height: 200px; margin: 20px 0;"></div>
-            <button class="btn btn-primary" onclick="skipRedirect()">Skip Ad</button>
+            <p class="text-muted">Please wait while we load the advertisement</p>
+            <div class="ad-message">
+                <strong>?? Advertisement Required</strong><br>
+                <small>Please watch a short ad to continue to your destination</small>
+            </div>
+            <p class="text-muted" id="statusText">Initializing ad system...</p>
+            <button class="btn btn-primary" id="skipBtn" onclick="skipToAd()" style="display: none;">
+                Continue with Ad
+            </button>
         </div>
         
         <script>
-            let countdown = 3;
             const originalUrl = <?php echo json_encode($link['original_url']); ?>;
             const linkId = <?php echo $link['id']; ?>;
             const userId = <?php echo json_encode($userId); ?>;
+            const API_URL = '<?php echo BASE_URL; ?>/api';
+            const BASE_URL = '<?php echo BASE_URL; ?>';
             
-            const timer = setInterval(() => {
-                countdown--;
-                document.getElementById('countdown').textContent = countdown;
+            // User data for ad system
+            const userData = {
+                id: userId || 0
+            };
+            
+            let adShown = false;
+            let adInitTimeout = null;
+            
+            // Update status text
+            function updateStatus(message) {
+                document.getElementById('statusText').textContent = message;
+            }
+            
+            // Show skip button after timeout
+            function showSkipButton() {
+                const skipBtn = document.getElementById('skipBtn');
+                if (skipBtn && !adShown) {
+                    skipBtn.style.display = 'inline-block';
+                    updateStatus('Click the button below to watch an ad and continue');
+                }
+            }
+            
+            // Main initialization
+            async function initialize() {
+                try {
+                    updateStatus('Loading ad system...');
+                    
+                    // Wait for AdManager to be available
+                    let retries = 0;
+                    const maxRetries = 50; // 5 seconds max wait
+                    
+                    while (typeof AdManager === 'undefined' && retries < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        retries++;
+                    }
+                    
+                    if (typeof AdManager === 'undefined') {
+                        updateStatus('Ad system loaded. Click below to continue.');
+                        showSkipButton();
+                        return;
+                    }
+                    
+                    updateStatus('Ad system ready. Preparing advertisement...');
+                    
+                    // Initialize AdManager
+                    await AdManager.init();
+                    
+                    // Show skip button after 3 seconds
+                    setTimeout(showSkipButton, 3000);
+                    
+                    updateStatus('Ready to show advertisement');
+                    
+                    // Auto-start ad after 2 seconds
+                    setTimeout(() => {
+                        if (!adShown) {
+                            skipToAd();
+                        }
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                    updateStatus('Error loading ad system');
+                    showSkipButton();
+                }
+            }
+            
+            async function skipToAd() {
+                if (adShown) return;
+                adShown = true;
                 
-                if (countdown <= 0) {
-                    clearInterval(timer);
-                    redirect();
+                try {
+                    updateStatus('Loading advertisement...');
+                    
+                    // Show ad with redirect callback
+                    await AdManager.show('shortlink', async () => {
+                        // Ad completed successfully
+                        updateStatus('Redirecting to your destination...');
+                        
+                        // Record conversion
+                        if (userId) {
+                            try {
+                                await fetch(`${BASE_URL}/api/track.php?action=conversion&link_id=${linkId}&user_id=${userId}`);
+                            } catch (e) {
+                                console.error('Conversion tracking error:', e);
+                            }
+                        }
+                        
+                        // Redirect after short delay
+                        setTimeout(() => {
+                            window.location.href = originalUrl;
+                        }, 500);
+                    });
+                    
+                } catch (error) {
+                    console.error('Ad display error:', error);
+                    updateStatus('Error showing ad. Redirecting anyway...');
+                    
+                    // Redirect anyway after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = originalUrl;
+                    }, 2000);
                 }
-            }, 1000);
-            
-            function skipRedirect() {
-                clearInterval(timer);
-                redirect();
             }
             
-            function redirect() {
-                // Record conversion
-                if (userId) {
-                    fetch('<?php echo BASE_URL; ?>/api/track.php?action=conversion&link_id=' + linkId + '&user_id=' + userId);
-                }
-                window.location.href = originalUrl;
-            }
+            // Load ads.js dynamically
+            const adsScript = document.createElement('script');
+            adsScript.src = '<?php echo BASE_URL; ?>/js/ads.js';
+            adsScript.onload = () => {
+                console.log('Ads.js loaded successfully');
+                initialize();
+            };
+            adsScript.onerror = () => {
+                console.error('Failed to load ads.js');
+                updateStatus('Error loading ad system. You will be redirected shortly...');
+                setTimeout(() => {
+                    window.location.href = originalUrl;
+                }, 3000);
+            };
+            document.head.appendChild(adsScript);
+            
         </script>
     </body>
     </html>
