@@ -247,16 +247,15 @@ const AdManager = {
                 
                 if (typeof show_10113890 === 'function') {
                     let adCompleted = false;
-                    let adShowing = false;
                     
-                    // Prevent multiple simultaneous ad calls
-                    if (adShowing) {
-                        console.warn('⚠️ Monetag ad already showing, skipping...');
+                    // Global flag to prevent multiple Monetag instances
+                    if (window.monetagAdInProgress) {
+                        console.warn('⚠️ Monetag ad already in progress globally, skipping...');
                         reject(new Error('Monetag ad already in progress'));
                         return;
                     }
                     
-                    adShowing = true;
+                    window.monetagAdInProgress = true;
                     
                     // Determine the ad type based on unit configuration
                     const adType = adUnit.type || 'interstitial';
@@ -265,7 +264,7 @@ const AdManager = {
                         if (!adCompleted) {
                             console.log('✅ Monetag ad completed');
                             adCompleted = true;
-                            adShowing = false;
+                            window.monetagAdInProgress = false;
                             resolve();
                         }
                     };
@@ -274,7 +273,7 @@ const AdManager = {
                         if (!adCompleted) {
                             console.error('❌ Monetag error:', error);
                             adCompleted = true;
-                            adShowing = false;
+                            window.monetagAdInProgress = false;
                             reject(new Error('Monetag ad failed: ' + (error?.message || error)));
                         }
                     };
@@ -305,7 +304,7 @@ const AdManager = {
                     setTimeout(() => {
                         if (!adCompleted) {
                             console.warn('⏱️ Monetag ad timeout');
-                            adShowing = false;
+                            window.monetagAdInProgress = false;
                             reject(new Error('Monetag ad timeout'));
                         }
                     }, 30000);
