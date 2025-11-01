@@ -1,8 +1,8 @@
 <?php
 // Database Configuration
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'u988479389_tery');
-define('DB_USER', 'u988479389_tery');
+define('DB_NAME', 'u988479389_tape');
+define('DB_USER', 'u988479389_tape');
 define('DB_PASS', 'your_password_here'); // Update with actual password
 
 // Check if database credentials are set
