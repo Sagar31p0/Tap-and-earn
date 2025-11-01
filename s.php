@@ -270,16 +270,17 @@ if ($link['mode'] === 'task_video') {
     </html>
     <?php
 } else {
-    // Direct ad - show interstitial then redirect
+    // Direct ad - show video player style interface with ad
     ?>
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>Redirecting...</title>
+        <title>Loading Content...</title>
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         
         <script>
             // Check if opened via direct web app link (startapp parameter)
@@ -304,50 +305,183 @@ if ($link['mode'] === 'task_video') {
             }
         </script>
         <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
             body {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #0f0f1e;
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                margin: 0;
                 padding: 20px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
-            .redirect-container {
-                background: white;
+            
+            .video-player-container {
+                background: #1a1a2e;
                 border-radius: 20px;
-                padding: 40px;
-                max-width: 600px;
+                max-width: 800px;
                 width: 100%;
-                text-align: center;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                overflow: hidden;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             }
-            .spinner {
-                width: 60px;
-                height: 60px;
-                border: 5px solid #f3f3f3;
-                border-top: 5px solid #667eea;
+            
+            .video-player {
+                position: relative;
+                width: 100%;
+                aspect-ratio: 16/9;
+                background: #000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+            
+            .video-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+                backdrop-filter: blur(5px);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 1;
+            }
+            
+            .loading-spinner {
+                width: 80px;
+                height: 80px;
+                border: 6px solid rgba(255, 255, 255, 0.2);
+                border-top: 6px solid #fff;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
-                margin: 20px auto;
+                margin-bottom: 20px;
             }
+            
             @keyframes spin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
             }
-            .ad-message {
-                background: #fff3cd;
-                border: 1px solid #ffc107;
-                border-radius: 10px;
-                padding: 15px;
-                margin: 20px 0;
-                color: #856404;
+            
+            .loading-text {
+                color: #fff;
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                text-align: center;
             }
-            #skipBtn {
+            
+            .loading-subtext {
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 16px;
+                text-align: center;
+            }
+            
+            .ad-ready-icon {
+                font-size: 80px;
+                color: #10b981;
+                margin-bottom: 20px;
                 display: none;
-                margin-top: 20px;
+                animation: scaleIn 0.5s ease;
             }
+            
+            @keyframes scaleIn {
+                from { transform: scale(0); }
+                to { transform: scale(1); }
+            }
+            
+            .player-controls {
+                background: #1a1a2e;
+                padding: 20px 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .content-info {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .content-icon {
+                width: 60px;
+                height: 60px;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 28px;
+                color: white;
+            }
+            
+            .content-details {
+                flex: 1;
+            }
+            
+            .content-title {
+                color: #fff;
+                font-size: 18px;
+                font-weight: 600;
+                margin-bottom: 5px;
+            }
+            
+            .content-meta {
+                color: rgba(255, 255, 255, 0.6);
+                font-size: 14px;
+            }
+            
+            .watch-btn {
+                width: 100%;
+                padding: 18px;
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                border: none;
+                border-radius: 15px;
+                font-size: 18px;
+                font-weight: 600;
+                cursor: pointer;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                transition: all 0.3s;
+                box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            }
+            
+            .watch-btn:active {
+                transform: scale(0.98);
+            }
+            
+            .watch-btn i {
+                font-size: 24px;
+            }
+            
+            .ad-notice {
+                background: rgba(255, 193, 7, 0.1);
+                border: 1px solid rgba(255, 193, 7, 0.3);
+                border-radius: 10px;
+                padding: 12px;
+                color: #ffc107;
+                font-size: 14px;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            
             .ad-loading-overlay {
                 display: none;
                 position: fixed;
@@ -360,9 +494,11 @@ if ($link['mode'] === 'task_video') {
                 align-items: center;
                 justify-content: center;
             }
+            
             .ad-loading-overlay.show {
                 display: flex;
             }
+            
             .ad-loading-content {
                 background: white;
                 border-radius: 20px;
@@ -371,6 +507,7 @@ if ($link['mode'] === 'task_video') {
                 max-width: 400px;
                 width: 90%;
             }
+            
             .ad-loading-spinner {
                 width: 60px;
                 height: 60px;
@@ -380,28 +517,34 @@ if ($link['mode'] === 'task_video') {
                 animation: spin 1s linear infinite;
                 margin: 0 auto 20px;
             }
+            
             .ad-loading-text {
                 font-size: 24px;
                 font-weight: bold;
                 margin-bottom: 10px;
             }
+            
             .ad-loading-subtext {
                 color: #666;
                 margin-bottom: 10px;
             }
+            
             .ad-error-content {
                 background: #fff3cd;
             }
+            
             .ad-error-icon {
                 font-size: 48px;
                 margin-bottom: 15px;
             }
+            
             .ad-error-text {
                 font-size: 20px;
                 font-weight: bold;
                 color: #856404;
                 margin-bottom: 10px;
             }
+            
             .ad-retry-btn {
                 background: #667eea;
                 color: white;
@@ -412,6 +555,28 @@ if ($link['mode'] === 'task_video') {
                 cursor: pointer;
                 margin-top: 15px;
             }
+            
+            @media (max-width: 768px) {
+                .video-player-container {
+                    border-radius: 15px;
+                }
+                
+                .loading-text {
+                    font-size: 20px;
+                }
+                
+                .loading-subtext {
+                    font-size: 14px;
+                }
+                
+                .player-controls {
+                    padding: 15px 20px;
+                }
+                
+                .content-title {
+                    font-size: 16px;
+                }
+            }
         </style>
         
         <!-- Load Ad SDKs -->
@@ -421,18 +586,40 @@ if ($link['mode'] === 'task_video') {
         <script async src="https://cdn.adexium.io/tags/10113890/inpage.min.js"></script>
     </head>
     <body>
-        <div class="redirect-container">
-            <h3>?? Redirecting...</h3>
-            <div class="spinner"></div>
-            <p class="text-muted">Please wait while we load the advertisement</p>
-            <div class="ad-message">
-                <strong>?? Advertisement Required</strong><br>
-                <small>Please watch a short ad to continue to your destination</small>
+        <!-- Video Player Style Container -->
+        <div class="video-player-container">
+            <!-- Video Player Area -->
+            <div class="video-player">
+                <div class="video-overlay">
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+                    <i class="fas fa-check-circle ad-ready-icon" id="adReadyIcon"></i>
+                    <div class="loading-text" id="loadingText">Loading Ad...</div>
+                    <div class="loading-subtext" id="loadingSubtext">Please wait while we prepare your content</div>
+                </div>
             </div>
-            <p class="text-muted" id="statusText">Initializing ad system...</p>
-            <button class="btn btn-primary" id="skipBtn" onclick="skipToAd()" style="display: none;">
-                Continue with Ad
-            </button>
+            
+            <!-- Player Controls -->
+            <div class="player-controls">
+                <div class="content-info">
+                    <div class="content-icon">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <div class="content-details">
+                        <div class="content-title">Short Link Redirect</div>
+                        <div class="content-meta">Watch a short ad to continue</div>
+                    </div>
+                </div>
+                
+                <div class="ad-notice">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Advertisement required to access content</span>
+                </div>
+                
+                <button class="watch-btn" id="watchBtn" onclick="redirectToDestination()">
+                    <i class="fas fa-play-circle"></i>
+                    <span>Watch Now & Continue</span>
+                </button>
+            </div>
         </div>
         
         <script>
@@ -440,10 +627,7 @@ if ($link['mode'] === 'task_video') {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 tg.ready();
-                tg.expand(); // Expand to full height
-                
-                // Set theme colors
-                document.body.style.background = tg.backgroundColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                tg.expand();
             }
             
             const originalUrl = <?php echo json_encode($link['original_url']); ?>;
@@ -457,78 +641,62 @@ if ($link['mode'] === 'task_video') {
                 id: userId || 0
             };
             
+            let adReady = false;
             let adShown = false;
-            let adInitTimeout = null;
             
-            // Update status text
-            function updateStatus(message) {
-                document.getElementById('statusText').textContent = message;
+            // UI Elements
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const adReadyIcon = document.getElementById('adReadyIcon');
+            const loadingText = document.getElementById('loadingText');
+            const loadingSubtext = document.getElementById('loadingSubtext');
+            const watchBtn = document.getElementById('watchBtn');
+            
+            // Update UI to show ad is ready
+            function showAdReady() {
+                loadingSpinner.style.display = 'none';
+                adReadyIcon.style.display = 'block';
+                loadingText.textContent = 'Ad Ready!';
+                loadingSubtext.textContent = 'Click the button below to watch and continue';
+                watchBtn.style.display = 'flex';
+                adReady = true;
             }
             
-            // Show skip button after timeout
-            function showSkipButton() {
-                const skipBtn = document.getElementById('skipBtn');
-                if (skipBtn && !adShown) {
-                    skipBtn.style.display = 'inline-block';
-                    updateStatus('Click the button below to watch an ad and continue');
-                }
+            // Update UI to show error
+            function showError(message) {
+                loadingSpinner.style.display = 'none';
+                adReadyIcon.style.display = 'none';
+                loadingText.textContent = 'Error';
+                loadingText.style.color = '#ef4444';
+                loadingSubtext.textContent = message || 'Failed to load ad';
+                
+                // Show watch button anyway to let user try
+                setTimeout(() => {
+                    watchBtn.style.display = 'flex';
+                    watchBtn.querySelector('span').textContent = 'Try to Continue';
+                }, 2000);
             }
             
-            // Main initialization
-            async function initialize() {
-                try {
-                    updateStatus('Loading ad system...');
-                    
-                    // Wait for AdManager to be available
-                    let retries = 0;
-                    const maxRetries = 50; // 5 seconds max wait
-                    
-                    while (typeof AdManager === 'undefined' && retries < maxRetries) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        retries++;
-                    }
-                    
-                    if (typeof AdManager === 'undefined') {
-                        updateStatus('Ad system loaded. Click below to continue.');
-                        showSkipButton();
-                        return;
-                    }
-                    
-                    updateStatus('Ad system ready. Preparing advertisement...');
-                    
-                    // Initialize AdManager
-                    await AdManager.init();
-                    
-                    // Show skip button after 3 seconds
-                    setTimeout(showSkipButton, 3000);
-                    
-                    updateStatus('Ready to show advertisement');
-                    
-                    // Auto-start ad after 2 seconds
-                    setTimeout(() => {
-                        if (!adShown) {
-                            skipToAd();
-                        }
-                    }, 2000);
-                    
-                } catch (error) {
-                    console.error('Initialization error:', error);
-                    updateStatus('Error loading ad system');
-                    showSkipButton();
-                }
-            }
-            
-            async function skipToAd() {
+            // Main redirect function
+            async function redirectToDestination() {
                 if (adShown) return;
                 adShown = true;
                 
+                // Disable button
+                watchBtn.disabled = true;
+                watchBtn.style.opacity = '0.7';
+                watchBtn.querySelector('span').textContent = 'Loading Ad...';
+                
                 try {
-                    updateStatus('Loading advertisement...');
+                    if (typeof AdManager === 'undefined') {
+                        throw new Error('Ad system not loaded');
+                    }
                     
                     // Show ad with redirect callback
                     await AdManager.show('shortlink', async () => {
                         // Ad completed successfully
-                        updateStatus('Redirecting to your destination...');
+                        loadingText.textContent = 'Success!';
+                        loadingSubtext.textContent = 'Redirecting to your destination...';
+                        watchBtn.querySelector('span').textContent = 'Redirecting...';
                         
                         // Record conversion
                         if (userId) {
@@ -542,17 +710,62 @@ if ($link['mode'] === 'task_video') {
                         // Redirect after short delay
                         setTimeout(() => {
                             window.location.href = originalUrl;
-                        }, 500);
+                        }, 1000);
                     });
                     
                 } catch (error) {
                     console.error('Ad display error:', error);
-                    updateStatus('Error showing ad. Redirecting anyway...');
+                    loadingText.textContent = 'Ad Error';
+                    loadingSubtext.textContent = 'Redirecting to destination...';
                     
                     // Redirect anyway after 2 seconds
                     setTimeout(() => {
                         window.location.href = originalUrl;
                     }, 2000);
+                }
+            }
+            
+            // Main initialization
+            async function initialize() {
+                try {
+                    loadingText.textContent = 'Loading Ad...';
+                    loadingSubtext.textContent = 'Initializing ad system...';
+                    
+                    // Wait for AdManager to be available
+                    let retries = 0;
+                    const maxRetries = 50;
+                    
+                    while (typeof AdManager === 'undefined' && retries < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        retries++;
+                    }
+                    
+                    if (typeof AdManager === 'undefined') {
+                        showError('Ad system failed to load');
+                        return;
+                    }
+                    
+                    loadingSubtext.textContent = 'Preparing advertisement...';
+                    
+                    // Initialize AdManager
+                    await AdManager.init();
+                    
+                    // Check if ad config exists
+                    loadingSubtext.textContent = 'Checking ad availability...';
+                    const adConfig = await AdManager.getAdConfig('shortlink');
+                    
+                    if (!adConfig || !adConfig.success) {
+                        showError('No ad configuration found. Please setup ads in admin panel.');
+                        return;
+                    }
+                    
+                    // Ad is ready
+                    console.log('Ad ready:', adConfig);
+                    showAdReady();
+                    
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                    showError(error.message || 'Failed to initialize');
                 }
             }
             
@@ -565,10 +778,7 @@ if ($link['mode'] === 'task_video') {
             };
             adsScript.onerror = () => {
                 console.error('Failed to load ads.js');
-                updateStatus('Error loading ad system. You will be redirected shortly...');
-                setTimeout(() => {
-                    window.location.href = originalUrl;
-                }, 3000);
+                showError('Failed to load ad system');
             };
             document.head.appendChild(adsScript);
             
