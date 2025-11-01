@@ -19,12 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         $db->commit();
-        $success = "Settings updated successfully!";
         
-        // Clear any opcode cache
-        if (function_exists('opcache_reset')) {
-            opcache_reset();
-        }
+        // CRITICAL: Clear ALL caches to ensure settings take effect immediately
+        $cacheCleared = clearAllCache(false);
+        
+        $success = "Settings updated successfully! Cache cleared: " . implode(', ', $cacheCleared) . ". Changes will take effect immediately.";
         
     } catch (Exception $e) {
         if ($db->inTransaction()) {
@@ -45,6 +44,11 @@ while ($row = $stmt->fetch()) {
 
 <div class="page-header">
     <h2><i class="fas fa-cog"></i> Global Settings</h2>
+</div>
+
+<div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> <strong>Important:</strong> Settings are automatically cached for performance. 
+    After saving changes, cache is automatically cleared. If changes don't appear immediately, use the "Force Clear Cache" button below.
 </div>
 
 <?php if (isset($success)): ?>
